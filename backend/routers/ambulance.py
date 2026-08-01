@@ -103,3 +103,25 @@ def update_ambulance(
         "message": "Ambulance updated successfully",
         "data": db_ambulance
     }
+
+@router.delete("/ambulances/{ambulance_id}")
+def delete_ambulance(
+    ambulance_id: int,
+    db: Session = Depends(get_db)
+):
+    db_ambulance = db.query(Ambulance).filter(
+        Ambulance.id == ambulance_id
+    ).first()
+
+    if not db_ambulance:
+        raise HTTPException(
+            status_code=404,
+            detail="Ambulance not found"
+        )
+
+    db.delete(db_ambulance)
+    db.commit()
+
+    return {
+        "message": "Ambulance deleted successfully"
+    }
