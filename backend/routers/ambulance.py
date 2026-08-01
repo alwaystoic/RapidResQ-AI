@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.database.database import get_db
@@ -8,6 +8,9 @@ from backend.schemas.ambulance import AmbulanceCreate
 router = APIRouter()
 
 
+# -------------------------------
+# GET ALL AMBULANCES
+# -------------------------------
 @router.get("/ambulances")
 def get_ambulances(
     status: str | None = Query(default=None),
@@ -20,8 +23,14 @@ def get_ambulances(
 
     ambulances = query.all()
 
-    return {"ambulances": ambulances}
+    return {
+        "ambulances": ambulances
+    }
 
+
+# -------------------------------
+# GET SINGLE AMBULANCE
+# -------------------------------
 @router.get("/ambulances/{ambulance_id}")
 def get_ambulance(
     ambulance_id: int,
@@ -32,12 +41,17 @@ def get_ambulance(
     ).first()
 
     if not ambulance:
-        return {
-            "message": "Ambulance not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Ambulance not found"
+        )
 
     return ambulance
 
+
+# -------------------------------
+# CREATE AMBULANCE
+# -------------------------------
 @router.post("/ambulances", status_code=status.HTTP_201_CREATED)
 def create_ambulance(
     ambulance: AmbulanceCreate,
@@ -58,6 +72,10 @@ def create_ambulance(
         "data": new_ambulance
     }
 
+
+# -------------------------------
+# UPDATE AMBULANCE
+# -------------------------------
 @router.put("/ambulances/{ambulance_id}")
 def update_ambulance(
     ambulance_id: int,
@@ -69,9 +87,10 @@ def update_ambulance(
     ).first()
 
     if not db_ambulance:
-        return {
-            "message": "Ambulance not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Ambulance not found"
+        )
 
     db_ambulance.vehicle = ambulance.vehicle
     db_ambulance.status = ambulance.status
