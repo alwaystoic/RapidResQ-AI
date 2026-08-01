@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
+from backend.schemas.ambulance import AmbulanceCreate, AmbulanceUpdate
 
 router = APIRouter()
 
@@ -37,4 +38,26 @@ def get_ambulance(ambulance_id: int):
         "vehicle": f"AMB-{100 + ambulance_id}",
         "status": "Available",
         "location": "Pune"
+    }
+
+@router.post("/ambulances", status_code=status.HTTP_201_CREATED)
+def create_ambulance(ambulance: AmbulanceCreate):
+    return {
+        "message": "Ambulance created successfully",
+        "data": ambulance
+    }
+
+@router.put("/ambulances/{ambulance_id}")
+def update_ambulance(
+    ambulance_id: int,
+    ambulance: AmbulanceUpdate
+):
+    return {
+        "message": "Ambulance updated successfully",
+        "data": {
+            "id": ambulance_id,
+            "vehicle": ambulance.vehicle,
+            "status": ambulance.status,
+            "location": ambulance.location
+        }
     }
