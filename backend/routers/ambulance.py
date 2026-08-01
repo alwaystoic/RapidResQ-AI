@@ -1,63 +1,86 @@
-from fastapi import APIRouter, Query, status
-from backend.schemas.ambulance import AmbulanceCreate, AmbulanceUpdate
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
+
+from backend.database.database import get_db
+from backend.models.ambulance import Ambulance
+from backend.schemas.ambulance import AmbulanceCreate
 
 router = APIRouter()
 
 
 @router.get("/ambulances")
-def get_ambulances(status: str | None = Query(default=None)):
-    ambulances = [
-        {
-            "id": 1,
-            "vehicle": "AMB-101",
-            "status": "Available",
-            "location": "Shivajinagar"
-        },
-        {
-            "id": 2,
-            "vehicle": "AMB-102",
-            "status": "On Duty",
-            "location": "Kothrud"
-        }
-    ]
+def get_ambulances(
+    status: str | None = Query(default=None),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Ambulance)
 
     if status:
-        ambulances = [
-            ambulance
-            for ambulance in ambulances
-            if ambulance["status"].lower() == status.lower()
-        ]
+        query = query.filter(Ambulance.status == status)
+
+    ambulances = query.all()
 
     return {"ambulances": ambulances}
 
-
 @router.get("/ambulances/{ambulance_id}")
-def get_ambulance(ambulance_id: int):
-    return {
-        "id": ambulance_id,
-        "vehicle": f"AMB-{100 + ambulance_id}",
-        "status": "Available",
-        "location": "Pune"
-    }
+def get_ambulance(
+    ambulance_id: int,
+    db: Session = Depends(get_db)
+):
+    ambulance = db.query(Ambulance).filter(
+        Ambulance.id == ambulance_id
+    ).first()
+
+    if not ambulance:
+        return {
+            "message": "Ambulance not found"
+        }
+
+    return ambulance
 
 @router.post("/ambulances", status_code=status.HTTP_201_CREATED)
-def create_ambulance(ambulance: AmbulanceCreate):
+def create_ambulance(
+    ambulance: AmbulanceCreate,
+    db: Session = Depends(get_db)
+):
+    new_ambulance = Ambulance(
+        vehicle=ambulance.vehicle,
+        status=ambulance.status,
+        location=ambulance.location
+    )
+
+    db.add(new_ambulance)
+    db.commit()
+    db.refresh(new_ambulance)
+
     return {
         "message": "Ambulance created successfully",
-        "data": ambulance
+        "data": new_ambulance
     }
 
 @router.put("/ambulances/{ambulance_id}")
 def update_ambulance(
     ambulance_id: int,
-    ambulance: AmbulanceUpdate
+    ambulance: AmbulanceCreate,
+    db: Session = Depends(get_db)
 ):
+    db_ambulance = db.query(Ambulance).filter(
+        Ambulance.id == ambulance_id
+    ).first()
+
+    if not db_ambulance:
+        return {
+            "message": "Ambulance not found"
+        }
+
+    db_ambulance.vehicle = ambulance.vehicle
+    db_ambulance.status = ambulance.status
+    db_ambulance.location = ambulance.location
+
+    db.commit()
+    db.refresh(db_ambulance)
+
     return {
         "message": "Ambulance updated successfully",
-        "data": {
-            "id": ambulance_id,
-            "vehicle": ambulance.vehicle,
-            "status": ambulance.status,
-            "location": ambulance.location
-        }
+        "data": db_ambulance
     }

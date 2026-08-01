@@ -1,14 +1,12 @@
 from fastapi import FastAPI
-from backend.routers.ambulance import router as ambulance_router
 
-app = FastAPI()
+from backend.database.database import engine, Base
+from backend.models.ambulance import Ambulance
 
+Base.metadata.create_all(bind=engine)
 
-@app.get("/")
-def home():
-    return {
-        "message": "Welcome to RapidResQ AI 🚑"
-    }
+app = FastAPI(title="RapidResQ API")
 
+from backend.routers import ambulance
 
-app.include_router(ambulance_router)
+app.include_router(ambulance.router)
