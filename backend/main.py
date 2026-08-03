@@ -6,11 +6,13 @@ from backend.database.database import engine, Base
 from backend.models.ambulance import Ambulance
 from backend.models.hospital import Hospital
 from backend.models.emergency import Emergency
+from backend.models.user import User
 
 # Import routers
 from backend.routers import ambulance
 from backend.routers import hospital
 from backend.routers import emergency
+from backend.routers import user
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -21,6 +23,7 @@ app = FastAPI(title="RapidResQ API")
 app.include_router(ambulance.router)
 app.include_router(hospital.router)
 app.include_router(emergency.router)
+app.include_router(user.router)
 
 
 @app.get("/")
