@@ -5,24 +5,37 @@ from backend.database.database import get_db
 from backend.models.user import User
 from backend.schemas.user import UserCreate
 
+from backend.auth.dependencies import get_current_user
+
 router = APIRouter()
 
 
+# ==========================
+# GET ALL USERS (Protected)
+# ==========================
 @router.get("/users")
 def get_users(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    print("INSIDE GET USERS")
+
     users = db.query(User).all()
 
     return {
+        "logged_in_as": current_user.email,
         "users": users
     }
 
 
+# ==========================
+# CREATE USER (Protected)
+# ==========================
 @router.post("/users", status_code=status.HTTP_201_CREATED)
 def create_user(
     user: UserCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     existing_user = db.query(User).filter(
         User.email == user.email
@@ -52,13 +65,41 @@ def create_user(
     }
 
 
+# ==========================
+# GET SINGLE USER (Protected)
+# ==========================
+@router.get("/users/{user_id}")
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    db_user = db.query(User).filter(
+        User.id == user_id
+    ).first()
+
+    if not db_user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    return db_user
+
+
+# ==========================
+# UPDATE USER (Protected)
+# ==========================
 @router.put("/users/{user_id}")
 def update_user(
     user_id: int,
     user: UserCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    db_user = db.query(User).filter(User.id == user_id).first()
+    db_user = db.query(User).filter(
+        User.id == user_id
+    ).first()
 
     if not db_user:
         raise HTTPException(
@@ -80,12 +121,19 @@ def update_user(
         "data": db_user
     }
 
+
+# ==========================
+# DELETE USER (Protected)
+# ==========================
 @router.delete("/users/{user_id}")
 def delete_user(
     user_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    db_user = db.query(User).filter(User.id == user_id).first()
+    db_user = db.query(User).filter(
+        User.id == user_id
+    ).first()
 
     if not db_user:
         raise HTTPException(
@@ -99,18 +147,3 @@ def delete_user(
     return {
         "message": "User deleted successfully"
     }
-
-@router.get("/users/{user_id}")
-def get_user(
-    user_id: int,
-    db: Session = Depends(get_db)
-):
-    db_user = db.query(User).filter(User.id == user_id).first()
-
-    if not db_user:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
-    return db_user
