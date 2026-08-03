@@ -14,6 +14,9 @@ from backend.routers import hospital
 from backend.routers import emergency
 from backend.routers import user
 
+# Import authentication router
+from backend.auth import auth
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
@@ -24,6 +27,7 @@ app.include_router(ambulance.router)
 app.include_router(hospital.router)
 app.include_router(emergency.router)
 app.include_router(user.router)
+app.include_router(auth.router)
 
 
 @app.get("/")
