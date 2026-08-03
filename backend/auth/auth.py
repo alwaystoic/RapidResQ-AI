@@ -1,9 +1,13 @@
+print("======================================")
+print("AUTH FILE LOADED")
+print(__file__)
+print("======================================")
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database.database import get_db
 from backend.models.user import User
-from backend.schemas.user import UserCreate
+from backend.schemas.user import UserCreate, UserLogin
 
 from backend.auth.hashing import hash_password, verify_password
 from backend.auth.security import create_access_token
@@ -13,6 +17,10 @@ router = APIRouter(
     tags=["Authentication"]
 )
 
+
+# ==========================
+# REGISTER
+# ==========================
 @router.post("/register")
 def register(
     user: UserCreate,
@@ -65,15 +73,18 @@ def register(
         "message": "User registered successfully"
     }
 
+
+# ==========================
+# LOGIN
+# ==========================
 @router.post("/login")
 def login(
-    email: str,
-    password: str,
+    login_data: UserLogin,
     db: Session = Depends(get_db)
 ):
 
     user = db.query(User).filter(
-        User.email == email
+        User.email == login_data.email
     ).first()
 
     if not user:
@@ -82,10 +93,7 @@ def login(
             detail="Invalid email or password"
         )
 
-    print("Plain password:", password)
-    print("Stored hash:", user.password)
-
-    if not verify_password(password, user.password):
+    if not verify_password(login_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"

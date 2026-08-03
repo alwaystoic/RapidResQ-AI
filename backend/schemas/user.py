@@ -7,3 +7,8 @@ class UserCreate(BaseModel):
     phone: str
     password: str
     role: str
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
