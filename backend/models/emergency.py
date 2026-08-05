@@ -1,7 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 
 from backend.database.database import Base
 
@@ -21,18 +20,27 @@ class Emergency(Base):
 
     status = Column(String, default="Pending")
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    severity = Column(String, default="Medium")
 
-    # User who created the emergency
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
 
-    # Assigned ambulance (optional)
-    ambulance_id = Column(Integer, ForeignKey("ambulances.id"), nullable=True)
+    ambulance_id = Column(
+        Integer,
+        ForeignKey("ambulances.id"),
+        nullable=True
+    )
 
-    # Assigned hospital (optional)
-    hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=True)
+    hospital_id = Column(
+        Integer,
+        ForeignKey("hospitals.id"),
+        nullable=True
+    )
 
-    # Relationships
-    user = relationship("User")
-    ambulance = relationship("Ambulance")
-    hospital = relationship("Hospital")
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )

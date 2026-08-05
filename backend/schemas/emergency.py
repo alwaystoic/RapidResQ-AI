@@ -19,14 +19,17 @@ class EmergencyUpdate(BaseModel):
 
 class EmergencyResponse(BaseModel):
     id: int
+
     patient_name: str
     phone: str
     emergency_type: str
     location: str
 
     status: str
+    severity: str
 
     user_id: int
+
     ambulance_id: Optional[int]
     hospital_id: Optional[int]
 

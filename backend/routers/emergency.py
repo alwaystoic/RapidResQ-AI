@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from backend.database.database import get_db
 from backend.models.emergency import Emergency
 from backend.models.user import User
+from backend.services.ai_service import predict_severity
 
 from backend.schemas.emergency import (
     EmergencyCreate,
@@ -61,19 +62,22 @@ def create_emergency(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    severity = predict_severity(emergency.emergency_type)
+
     new_emergency = Emergency(
         patient_name=emergency.patient_name,
         phone=emergency.phone,
         emergency_type=emergency.emergency_type,
         location=emergency.location,
 
-        status="Pending",
+        severity=severity,
 
-        user_id=current_user.id,
+    status="Pending",
+    user_id=current_user.id,
 
-        ambulance_id=None,
-        hospital_id=None
-    )
+    ambulance_id=None,
+    hospital_id=None
+)
 
     db.add(new_emergency)
     db.commit()
