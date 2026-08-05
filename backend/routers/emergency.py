@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from backend.database.database import get_db
 from backend.models.emergency import Emergency
 from backend.models.user import User
-from backend.services.ai_service import predict_severity
 
 from backend.schemas.emergency import (
     EmergencyCreate,
@@ -13,6 +12,9 @@ from backend.schemas.emergency import (
 
 from backend.auth.dependencies import get_current_user
 from backend.auth.roles import require_role
+
+from backend.services.ai_service import predict_severity
+from backend.services.assignment_service import assign_ambulance
 
 router = APIRouter()
 
@@ -25,6 +27,7 @@ def emergency_response(emergency):
         "emergency_type": emergency.emergency_type,
         "location": emergency.location,
         "status": emergency.status,
+        "severity": emergency.severity,
         "user_id": emergency.user_id,
         "ambulance_id": emergency.ambulance_id,
         "hospital_id": emergency.hospital_id,
@@ -32,10 +35,10 @@ def emergency_response(emergency):
     }
 
 
-# ==========================
-# GET ALL EMERGENCIES
-# (Admin Only)
-# ==========================
+# ==========================================
+# GET ALL EMERGENCIES (Admin Only)
+# ==========================================
+
 @router.get("/emergencies")
 def get_emergencies(
     db: Session = Depends(get_db),
@@ -52,17 +55,20 @@ def get_emergencies(
     }
 
 
-# ==========================
-# CREATE EMERGENCY
-# (Citizen + Admin)
-# ==========================
+# ==========================================
+# CREATE EMERGENCY (Citizen/Admin)
+# ==========================================
+
 @router.post("/emergencies", status_code=status.HTTP_201_CREATED)
 def create_emergency(
     emergency: EmergencyCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
     severity = predict_severity(emergency.emergency_type)
+
+    assigned_ambulance = assign_ambulance(db)
 
     new_emergency = Emergency(
         patient_name=emergency.patient_name,
@@ -72,12 +78,14 @@ def create_emergency(
 
         severity=severity,
 
-    status="Pending",
-    user_id=current_user.id,
+        status="Assigned" if assigned_ambulance else "Pending",
 
-    ambulance_id=None,
-    hospital_id=None
-)
+        user_id=current_user.id,
+
+        ambulance_id=assigned_ambulance.id if assigned_ambulance else None,
+
+        hospital_id=None
+    )
 
     db.add(new_emergency)
     db.commit()
@@ -89,15 +97,17 @@ def create_emergency(
     }
 
 
-# ==========================
+# ==========================================
 # GET SINGLE EMERGENCY
-# ==========================
+# ==========================================
+
 @router.get("/emergencies/{emergency_id}")
 def get_emergency(
     emergency_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
     emergency = db.query(Emergency).filter(
         Emergency.id == emergency_id
     ).first()
@@ -108,7 +118,6 @@ def get_emergency(
             detail="Emergency not found"
         )
 
-    # Citizens can only view their own emergencies
     if (
         current_user.role != "Admin"
         and emergency.user_id != current_user.id
@@ -121,10 +130,10 @@ def get_emergency(
     return emergency_response(emergency)
 
 
-# ==========================
-# UPDATE EMERGENCY
-# (Admin Only)
-# ==========================
+# ==========================================
+# UPDATE EMERGENCY (Admin Only)
+# ==========================================
+
 @router.put("/emergencies/{emergency_id}")
 def update_emergency(
     emergency_id: int,
@@ -132,6 +141,7 @@ def update_emergency(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("Admin"))
 ):
+
     db_emergency = db.query(Emergency).filter(
         Emergency.id == emergency_id
     ).first()
@@ -155,16 +165,17 @@ def update_emergency(
     }
 
 
-# ==========================
-# DELETE EMERGENCY
-# (Admin Only)
-# ==========================
+# ==========================================
+# DELETE EMERGENCY (Admin Only)
+# ==========================================
+
 @router.delete("/emergencies/{emergency_id}")
 def delete_emergency(
     emergency_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("Admin"))
 ):
+
     db_emergency = db.query(Emergency).filter(
         Emergency.id == emergency_id
     ).first()
