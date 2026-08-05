@@ -5,13 +5,32 @@ from backend.database.database import get_db
 from backend.models.hospital import Hospital
 from backend.schemas.hospital import HospitalCreate
 
+from backend.auth.dependencies import get_current_user
+from backend.auth.roles import require_role
+from backend.models.user import User
+
 router = APIRouter()
 
 
+def hospital_response(hospital):
+    return {
+        "id": hospital.id,
+        "name": hospital.name,
+        "location": hospital.location,
+        "contact": hospital.contact,
+        "available_beds": hospital.available_beds
+    }
+
+
+# ==========================
+# GET ALL HOSPITALS
+# (Citizen + Admin)
+# ==========================
 @router.get("/hospitals")
 def get_hospitals(
     location: str | None = Query(default=None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     query = db.query(Hospital)
 
@@ -20,13 +39,24 @@ def get_hospitals(
 
     hospitals = query.all()
 
-    return {"hospitals": hospitals}
+    return {
+        "logged_in_as": current_user.email,
+        "hospitals": [
+            hospital_response(h)
+            for h in hospitals
+        ]
+    }
 
 
+# ==========================
+# GET SINGLE HOSPITAL
+# (Citizen + Admin)
+# ==========================
 @router.get("/hospitals/{hospital_id}")
 def get_hospital(
     hospital_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     hospital = db.query(Hospital).filter(
         Hospital.id == hospital_id
@@ -38,13 +68,18 @@ def get_hospital(
             detail="Hospital not found"
         )
 
-    return hospital
+    return hospital_response(hospital)
 
 
+# ==========================
+# CREATE HOSPITAL
+# (Admin Only)
+# ==========================
 @router.post("/hospitals", status_code=status.HTTP_201_CREATED)
 def create_hospital(
     hospital: HospitalCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin"))
 ):
     new_hospital = Hospital(
         name=hospital.name,
@@ -59,15 +94,20 @@ def create_hospital(
 
     return {
         "message": "Hospital created successfully",
-        "data": new_hospital
+        "data": hospital_response(new_hospital)
     }
 
 
+# ==========================
+# UPDATE HOSPITAL
+# (Admin Only)
+# ==========================
 @router.put("/hospitals/{hospital_id}")
 def update_hospital(
     hospital_id: int,
     hospital: HospitalCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin"))
 ):
     db_hospital = db.query(Hospital).filter(
         Hospital.id == hospital_id
@@ -89,14 +129,19 @@ def update_hospital(
 
     return {
         "message": "Hospital updated successfully",
-        "data": db_hospital
+        "data": hospital_response(db_hospital)
     }
 
 
+# ==========================
+# DELETE HOSPITAL
+# (Admin Only)
+# ==========================
 @router.delete("/hospitals/{hospital_id}")
 def delete_hospital(
     hospital_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin"))
 ):
     db_hospital = db.query(Hospital).filter(
         Hospital.id == hospital_id
