@@ -6,6 +6,7 @@ from backend.models.user import User
 from backend.schemas.user import UserCreate
 
 from backend.auth.dependencies import get_current_user
+from backend.auth.roles import require_role
 
 router = APIRouter()
 
@@ -16,7 +17,7 @@ router = APIRouter()
 @router.get("/users")
 def get_users(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role("Admin"))
 ):
     print("INSIDE GET USERS")
 
