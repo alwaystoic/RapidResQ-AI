@@ -12,7 +12,7 @@ class EmergencyCreate(BaseModel):
 
 
 class EmergencyUpdate(BaseModel):
-    status: str
+    status: Optional[str] = None
     ambulance_id: Optional[int] = None
     hospital_id: Optional[int] = None
 

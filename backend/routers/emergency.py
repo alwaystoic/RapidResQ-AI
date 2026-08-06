@@ -176,13 +176,15 @@ def update_emergency(
             detail="Emergency not found"
         )
 
-    # Update only the fields provided
+    # Update status
     if emergency.status is not None:
         db_emergency.status = emergency.status
 
+    # Update ambulance only if provided
     if emergency.ambulance_id is not None:
         db_emergency.ambulance_id = emergency.ambulance_id
 
+    # Update hospital only if provided
     if emergency.hospital_id is not None:
         db_emergency.hospital_id = emergency.hospital_id
 
