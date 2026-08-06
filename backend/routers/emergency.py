@@ -17,6 +17,9 @@ from backend.services.ai_service import predict_severity
 from backend.services.assignment_service import assign_ambulance
 from backend.services.hospital_assignment import assign_hospital
 
+from backend.routers.ambulance import ambulance_response
+from backend.routers.hospital import hospital_response
+
 router = APIRouter()
 
 
@@ -78,7 +81,11 @@ def create_emergency(
     )
 
     # Automatic Hospital Assignment
-    assigned_hospital = assign_hospital(db)
+    assigned_hospital = assign_hospital(
+        db,
+        emergency.latitude,
+        emergency.longitude
+    )
 
     # Emergency Status
     if assigned_ambulance and assigned_hospital:
@@ -94,7 +101,7 @@ def create_emergency(
 
         latitude=emergency.latitude,
         longitude=emergency.longitude,
-        
+
         severity=severity,
         status=emergency_status,
 
@@ -111,21 +118,15 @@ def create_emergency(
     return {
         "message": "Emergency created successfully",
         "ambulance": (
-            {
-                "id": assigned_ambulance.id,
-                "vehicle": assigned_ambulance.vehicle
-            }
+            ambulance_response(assigned_ambulance)
             if assigned_ambulance else None
         ),
         "hospital": (
-            {
-                "id": assigned_hospital.id,
-                "name": assigned_hospital.name
-            }
+            hospital_response(assigned_hospital)
             if assigned_hospital else None
         ),
         "data": emergency_response(new_emergency)
-    }
+    }   
 
 
 # ==========================================

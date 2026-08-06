@@ -1,34 +1,46 @@
 from sqlalchemy.orm import Session
 
 from backend.models.hospital import Hospital
+from backend.utils.distance import haversine_distance
 
 
-def assign_hospital(db: Session):
+def assign_hospital(
+    db: Session,
+    emergency_latitude: float,
+    emergency_longitude: float
+):
     """
-    Find the first available hospital with at least one bed.
-    Later this will use AI + GPS + specialty matching.
+    Assign the nearest hospital that has available beds.
     """
 
-    hospital = (
+    available_hospitals = (
         db.query(Hospital)
-        .filter(
-            Hospital.status == "Available",
-            Hospital.available_beds > 0
-        )
-        .first()
+        .filter(Hospital.available_beds > 0)
+        .all()
     )
 
-    if hospital is None:
+    if not available_hospitals:
         return None
 
-    # Reserve one bed
-    hospital.available_beds -= 1
+    nearest = None
+    shortest_distance = float("inf")
 
-    # Mark hospital full if no beds remain
-    if hospital.available_beds == 0:
-        hospital.status = "Full"
+    for hospital in available_hospitals:
+
+        distance = haversine_distance(
+            emergency_latitude,
+            emergency_longitude,
+            hospital.latitude,
+            hospital.longitude
+        )
+
+        if distance < shortest_distance:
+            shortest_distance = distance
+            nearest = hospital
+
+    nearest.available_beds -= 1
 
     db.commit()
-    db.refresh(hospital)
+    db.refresh(nearest)
 
-    return hospital
+    return nearest
