@@ -176,9 +176,15 @@ def update_emergency(
             detail="Emergency not found"
         )
 
-    db_emergency.status = emergency.status
-    db_emergency.ambulance_id = emergency.ambulance_id
-    db_emergency.hospital_id = emergency.hospital_id
+    # Update only the fields provided
+    if emergency.status is not None:
+        db_emergency.status = emergency.status
+
+    if emergency.ambulance_id is not None:
+        db_emergency.ambulance_id = emergency.ambulance_id
+
+    if emergency.hospital_id is not None:
+        db_emergency.hospital_id = emergency.hospital_id
 
     db.commit()
     db.refresh(db_emergency)
