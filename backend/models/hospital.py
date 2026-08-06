@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Float
 
 from backend.database.database import Base
 
@@ -19,5 +19,16 @@ class Hospital(Base):
     status = Column(
         String,
         default="Available",
+        nullable=False
+    )
+
+    # GPS Coordinates
+    latitude = Column(
+        Float,
+        nullable=False
+    )
+
+    longitude = Column(
+        Float,
         nullable=False
     )
