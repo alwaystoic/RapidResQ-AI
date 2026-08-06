@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from backend.database.database import get_db
 from backend.models.emergency import Emergency
 from backend.models.user import User
+from backend.models.ambulance import Ambulance
+from backend.models.hospital import Hospital
 
 from backend.schemas.emergency import (
     EmergencyCreate,
@@ -231,4 +233,63 @@ def delete_emergency(
 
     return {
         "message": "Emergency deleted successfully"
+    }
+
+@router.put("/emergencies/{emergency_id}/complete")
+def complete_emergency(
+    emergency_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin"))
+):
+
+    emergency = (
+        db.query(Emergency)
+        .filter(Emergency.id == emergency_id)
+        .first()
+    )
+
+    if not emergency:
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency not found"
+        )
+
+    if emergency.status == "Completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Emergency already completed"
+        )
+
+    emergency.status = "Completed"
+
+    # Release Ambulance
+    if emergency.ambulance_id:
+
+        ambulance = (
+            db.query(Ambulance)
+            .filter(Ambulance.id == emergency.ambulance_id)
+            .first()
+        )
+
+        if ambulance:
+            ambulance.status = "Available"
+
+    # Release Hospital Bed
+    if emergency.hospital_id:
+
+        hospital = (
+            db.query(Hospital)
+            .filter(Hospital.id == emergency.hospital_id)
+            .first()
+        )
+
+        if hospital:
+            hospital.available_beds += 1
+
+    db.commit()
+    db.refresh(emergency)
+
+    return {
+        "message": "Emergency completed successfully",
+        "data": emergency_response(emergency)
     }
