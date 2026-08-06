@@ -15,6 +15,7 @@ from backend.auth.roles import require_role
 
 from backend.services.ai_service import predict_severity
 from backend.services.assignment_service import assign_ambulance
+from backend.services.hospital_assignment import assign_hospital
 
 router = APIRouter()
 
@@ -56,7 +57,7 @@ def get_emergencies(
 
 
 # ==========================================
-# CREATE EMERGENCY (Citizen/Admin)
+# CREATE EMERGENCY
 # ==========================================
 
 @router.post("/emergencies", status_code=status.HTTP_201_CREATED)
@@ -66,9 +67,20 @@ def create_emergency(
     current_user: User = Depends(get_current_user)
 ):
 
+    # AI Severity Prediction
     severity = predict_severity(emergency.emergency_type)
 
+    # Automatic Ambulance Assignment
     assigned_ambulance = assign_ambulance(db)
+
+    # Automatic Hospital Assignment
+    assigned_hospital = assign_hospital(db)
+
+    # Emergency Status
+    if assigned_ambulance and assigned_hospital:
+        emergency_status = "Assigned"
+    else:
+        emergency_status = "Pending"
 
     new_emergency = Emergency(
         patient_name=emergency.patient_name,
@@ -77,14 +89,12 @@ def create_emergency(
         location=emergency.location,
 
         severity=severity,
-
-        status="Assigned" if assigned_ambulance else "Pending",
+        status=emergency_status,
 
         user_id=current_user.id,
 
         ambulance_id=assigned_ambulance.id if assigned_ambulance else None,
-
-        hospital_id=None
+        hospital_id=assigned_hospital.id if assigned_hospital else None
     )
 
     db.add(new_emergency)
@@ -93,6 +103,20 @@ def create_emergency(
 
     return {
         "message": "Emergency created successfully",
+        "ambulance": (
+            {
+                "id": assigned_ambulance.id,
+                "vehicle": assigned_ambulance.vehicle
+            }
+            if assigned_ambulance else None
+        ),
+        "hospital": (
+            {
+                "id": assigned_hospital.id,
+                "name": assigned_hospital.name
+            }
+            if assigned_hospital else None
+        ),
         "data": emergency_response(new_emergency)
     }
 
@@ -131,7 +155,7 @@ def get_emergency(
 
 
 # ==========================================
-# UPDATE EMERGENCY (Admin Only)
+# UPDATE EMERGENCY
 # ==========================================
 
 @router.put("/emergencies/{emergency_id}")
@@ -166,7 +190,7 @@ def update_emergency(
 
 
 # ==========================================
-# DELETE EMERGENCY (Admin Only)
+# DELETE EMERGENCY
 # ==========================================
 
 @router.delete("/emergencies/{emergency_id}")
