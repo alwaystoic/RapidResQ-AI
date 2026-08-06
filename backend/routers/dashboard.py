@@ -1,20 +1,67 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.auth.roles import require_role
 from backend.database.database import get_db
-from backend.models.ambulance import Ambulance
-from backend.models.emergency import Emergency
-from backend.models.hospital import Hospital
+
+from backend.auth.dependencies import require_role
 from backend.models.user import User
 
-print("Dashboard router loaded")
+from backend.models.emergency import Emergency
+from backend.models.ambulance import Ambulance
+from backend.models.hospital import Hospital
 
 router = APIRouter(
     tags=["Dashboard"]
 )
 
+@router.get("/dashboard/admin")
+def admin_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin"))
+):
+
+    total_emergencies = db.query(Emergency).count()
+
+    pending_emergencies = (
+        db.query(Emergency)
+        .filter(Emergency.status == "Pending")
+        .count()
+    )
+
+    assigned_emergencies = (
+        db.query(Emergency)
+        .filter(Emergency.status == "Assigned")
+        .count()
+    )
+
+    available_ambulances = (
+        db.query(Ambulance)
+        .filter(Ambulance.status == "Available")
+        .count()
+    )
+
+    busy_ambulances = (
+        db.query(Ambulance)
+        .filter(Ambulance.status == "Busy")
+        .count()
+    )
+
+    total_available_beds = (
+        db.query(Hospital)
+        .with_entities(Hospital.available_beds)
+        .all()
+    )
+
+    beds = sum(bed[0] for bed in total_available_beds)
+
+    return {
+        "total_emergencies": total_emergencies,
+        "pending_emergencies": pending_emergencies,
+        "assigned_emergencies": assigned_emergencies,
+        "available_ambulances": available_ambulances,
+        "busy_ambulances": busy_ambulances,
+        "available_hospital_beds": beds
+    }
 
 @router.get("/dashboard")
 def dashboard(
