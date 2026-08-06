@@ -1,6 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Float
+)
 
 from backend.database.database import Base
 
@@ -18,9 +25,20 @@ class Emergency(Base):
 
     location = Column(String, nullable=False)
 
-    status = Column(String, default="Pending")
+    # GPS Coordinates
+    latitude = Column(Float, nullable=False)
 
-    severity = Column(String, default="Medium")
+    longitude = Column(Float, nullable=False)
+
+    status = Column(
+        String,
+        default="Pending"
+    )
+
+    severity = Column(
+        String,
+        default="Medium"
+    )
 
     user_id = Column(
         Integer,

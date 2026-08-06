@@ -71,7 +71,11 @@ def create_emergency(
     severity = predict_severity(emergency.emergency_type)
 
     # Automatic Ambulance Assignment
-    assigned_ambulance = assign_ambulance(db)
+    assigned_ambulance = assign_ambulance(
+        db,
+        emergency.latitude,
+        emergency.longitude
+    )
 
     # Automatic Hospital Assignment
     assigned_hospital = assign_hospital(db)
@@ -88,6 +92,9 @@ def create_emergency(
         emergency_type=emergency.emergency_type,
         location=emergency.location,
 
+        latitude=emergency.latitude,
+        longitude=emergency.longitude,
+        
         severity=severity,
         status=emergency_status,
 

@@ -10,6 +10,9 @@ class EmergencyCreate(BaseModel):
     emergency_type: str
     location: str
 
+    latitude: float
+    longitude: float
+
 
 class EmergencyUpdate(BaseModel):
     status: Optional[str] = None
