@@ -16,8 +16,10 @@ def ambulance_response(ambulance):
     return {
         "id": ambulance.id,
         "vehicle": ambulance.vehicle,
-        "status": ambulance.status,
-        "location": ambulance.location
+        "location": ambulance.location,
+        "latitude": ambulance.latitude,
+        "longitude": ambulance.longitude,
+        "status": ambulance.status
     }
 
 
@@ -120,6 +122,8 @@ def update_ambulance(
     db_ambulance.vehicle = ambulance.vehicle
     db_ambulance.status = ambulance.status
     db_ambulance.location = ambulance.location
+    db_ambulance.latitude = ambulance.latitude
+    db_ambulance.longitude = ambulance.longitude
 
     db.commit()
     db.refresh(db_ambulance)

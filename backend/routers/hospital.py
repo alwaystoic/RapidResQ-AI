@@ -123,6 +123,9 @@ def update_hospital(
     db_hospital.location = hospital.location
     db_hospital.contact = hospital.contact
     db_hospital.available_beds = hospital.available_beds
+    db_hospital.status = hospital.status
+    db_hospital.latitude = hospital.latitude
+    db_hospital.longitude = hospital.longitude
 
     db.commit()
     db.refresh(db_hospital)
