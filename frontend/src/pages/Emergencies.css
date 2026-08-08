@@ -1,0 +1,1106 @@
+/* =========================================================
+   RAPIDRESQ - EMERGENCIES PAGE
+   ========================================================= */
+
+/* =========================================================
+   PAGE BASE
+   ========================================================= */
+
+.emergencies-page {
+  min-height: 100vh;
+  width: 100%;
+  background: #f6f7f9;
+  color: #171717;
+  font-family: Arial, Helvetica, sans-serif;
+  box-sizing: border-box;
+}
+
+.emergencies-page *,
+.emergencies-page *::before,
+.emergencies-page *::after {
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   PAGE HEADER
+   ========================================================= */
+
+.emergencies-header,
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+
+  padding: 28px 32px 22px;
+
+  background: #ffffff;
+  border-bottom: 1px solid #ececec;
+}
+
+.emergencies-header h1,
+.page-header h1 {
+  margin: 0;
+
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 700;
+
+  color: #171717;
+}
+
+.emergencies-header p,
+.page-header p {
+  margin: 7px 0 0;
+
+  font-size: 14px;
+  line-height: 1.5;
+
+  color: #777777;
+}
+
+
+/* =========================================================
+   HEADER RIGHT SIDE
+   ========================================================= */
+
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 110px;
+  height: 42px;
+
+  padding: 0 18px;
+
+  border: none;
+  border-radius: 9px;
+
+  background: #e5252a;
+  color: #ffffff;
+
+  font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.refresh-button:hover {
+  background: #c91e23;
+
+  transform: translateY(-1px);
+
+  box-shadow: 0 6px 16px rgba(229, 37, 42, 0.22);
+}
+
+.refresh-button:active {
+  transform: translateY(0);
+}
+
+.refresh-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+/* =========================================================
+   PAGE CONTENT
+   ========================================================= */
+
+.emergencies-content {
+  width: 100%;
+  max-width: 1600px;
+
+  margin: 0 auto;
+
+  padding: 28px 32px 40px;
+}
+
+
+/* =========================================================
+   STATISTICS SECTION
+   ========================================================= */
+
+.emergency-stats,
+.stats-grid,
+.stats-container {
+  display: grid;
+
+  grid-template-columns:
+    repeat(5, minmax(0, 1fr));
+
+  gap: 18px;
+
+  width: 100%;
+
+  margin-bottom: 28px;
+}
+
+
+/* =========================================================
+   STAT CARD
+   ========================================================= */
+
+.emergency-stat-card,
+.stat-card {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+
+  min-height: 125px;
+
+  padding: 22px;
+
+  background: #ffffff;
+
+  border: 1px solid #e7e7e7;
+  border-radius: 14px;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.035);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.emergency-stat-card:hover,
+.stat-card:hover {
+  transform: translateY(-3px);
+
+  border-color: #dddddd;
+
+  box-shadow:
+    0 10px 25px rgba(0, 0, 0, 0.07);
+}
+
+
+/* =========================================================
+   STAT ICON
+   ========================================================= */
+
+.emergency-stat-card .stat-icon,
+.stat-card .stat-icon {
+  flex-shrink: 0;
+
+  width: 52px;
+  height: 52px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-right: 17px;
+
+  border-radius: 13px;
+
+  font-size: 23px;
+}
+
+
+/* Individual icon backgrounds */
+
+.emergency-stat-card:nth-child(1) .stat-icon,
+.stat-card:nth-child(1) .stat-icon {
+  background: #fff0f0;
+}
+
+.emergency-stat-card:nth-child(2) .stat-icon,
+.stat-card:nth-child(2) .stat-icon {
+  background: #fff6df;
+}
+
+.emergency-stat-card:nth-child(3) .stat-icon,
+.stat-card:nth-child(3) .stat-icon {
+  background: #edf4ff;
+}
+
+.emergency-stat-card:nth-child(4) .stat-icon,
+.stat-card:nth-child(4) .stat-icon {
+  background: #eaf9ef;
+}
+
+.emergency-stat-card:nth-child(5) .stat-icon,
+.stat-card:nth-child(5) .stat-icon {
+  background: #fff0f0;
+}
+
+
+/* =========================================================
+   STAT CONTENT
+   ========================================================= */
+
+.emergency-stat-card .stat-content,
+.stat-card .stat-content {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* =========================================================
+   STAT LABEL
+   ========================================================= */
+
+.emergency-stat-card .stat-label,
+.stat-card .stat-label,
+.emergency-stat-card p,
+.stat-card p {
+  display: block;
+
+  margin: 0 0 7px;
+
+  color: #707070;
+
+  font-size: 12px;
+  line-height: 1.4;
+
+  font-weight: 500;
+}
+
+
+/* =========================================================
+   STAT VALUE
+   ========================================================= */
+
+.emergency-stat-card .stat-value,
+.stat-card .stat-value,
+.emergency-stat-card h3,
+.stat-card h3 {
+  display: block;
+
+  margin: 0;
+
+  color: #171717;
+
+  font-size: 28px;
+  line-height: 1.1;
+
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   STAT DESCRIPTION
+   ========================================================= */
+
+.emergency-stat-card .stat-description,
+.stat-card .stat-description {
+  display: block;
+
+  margin-top: 7px;
+
+  color: #999999;
+
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   IMPORTANT:
+   PREVENT "Total Emergencies6" TYPE LAYOUT
+   ========================================================= */
+
+.emergency-stat-card > div:last-child,
+.stat-card > div:last-child {
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: flex-start;
+
+  justify-content: center;
+
+  min-width: 0;
+
+  gap: 0;
+}
+
+.emergency-stat-card > div:last-child p,
+.stat-card > div:last-child p {
+  margin-bottom: 7px;
+}
+
+.emergency-stat-card > div:last-child h3,
+.stat-card > div:last-child h3 {
+  margin-bottom: 0;
+}
+
+
+/* =========================================================
+   SECTION CARD
+   ========================================================= */
+
+.emergencies-section,
+.emergencies-table-card,
+.emergency-table-card {
+  width: 100%;
+
+  background: #ffffff;
+
+  border: 1px solid #e6e6e6;
+
+  border-radius: 15px;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 3px 12px rgba(0, 0, 0, 0.035);
+}
+
+
+/* =========================================================
+   SECTION HEADER
+   ========================================================= */
+
+.emergencies-section-header,
+.table-header,
+.emergencies-table-header {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 22px 24px;
+
+  border-bottom: 1px solid #eeeeee;
+}
+
+.emergencies-section-header h2,
+.table-header h2,
+.emergencies-table-header h2 {
+  margin: 0;
+
+  color: #171717;
+
+  font-size: 19px;
+  line-height: 1.3;
+
+  font-weight: 700;
+}
+
+.emergencies-section-header p,
+.table-header p,
+.emergencies-table-header p {
+  margin: 6px 0 0;
+
+  color: #888888;
+
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   CASE COUNT
+   ========================================================= */
+
+.case-count,
+.cases-count {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  min-width: 70px;
+
+  padding: 8px 12px;
+
+  border-radius: 8px;
+
+  background: #f5f6f8;
+
+  color: #555555;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   TABLE WRAPPER
+   ========================================================= */
+
+.emergency-table-wrapper,
+.table-container,
+.emergencies-table-container {
+  width: 100%;
+
+  overflow-x: auto;
+}
+
+
+/* =========================================================
+   TABLE
+   ========================================================= */
+
+.emergency-table,
+.emergencies-table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  table-layout: auto;
+
+  background: #ffffff;
+}
+
+
+/* =========================================================
+   TABLE HEADER
+   ========================================================= */
+
+.emergency-table thead,
+.emergencies-table thead {
+  background: #fafafa;
+}
+
+.emergency-table th,
+.emergencies-table th {
+  padding: 14px 16px;
+
+  border-bottom: 1px solid #eeeeee;
+
+  color: #777777;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  text-align: left;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   TABLE BODY
+   ========================================================= */
+
+.emergency-table td,
+.emergencies-table td {
+  padding: 16px;
+
+  border-bottom: 1px solid #eeeeee;
+
+  color: #444444;
+
+  font-size: 12px;
+
+  vertical-align: middle;
+
+  white-space: nowrap;
+}
+
+.emergency-table tbody tr,
+.emergencies-table tbody tr {
+  transition:
+    background 0.15s ease;
+}
+
+.emergency-table tbody tr:hover,
+.emergencies-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.emergency-table tbody tr:last-child td,
+.emergencies-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+
+/* =========================================================
+   ID
+   ========================================================= */
+
+.emergency-id {
+  color: #555555;
+
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   PATIENT
+   ========================================================= */
+
+.patient-info {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 4px;
+}
+
+.patient-name {
+  color: #222222;
+
+  font-weight: 700;
+}
+
+.patient-phone {
+  color: #999999;
+
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   LOCATION / EMERGENCY TYPE
+   ========================================================= */
+
+.emergency-type {
+  color: #333333;
+
+  font-weight: 600;
+}
+
+.emergency-location {
+  color: #555555;
+}
+
+
+/* =========================================================
+   SEVERITY BADGES
+   ========================================================= */
+
+.severity-badge,
+.severity {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  min-width: 58px;
+
+  padding: 5px 10px;
+
+  border-radius: 7px;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  line-height: 1.2;
+}
+
+
+/* Critical */
+
+.severity-critical,
+.severity.critical {
+  background: #ffe3e3;
+
+  color: #dc2626;
+}
+
+
+/* High */
+
+.severity-high,
+.severity.high {
+  background: #fff0d5;
+
+  color: #d97706;
+}
+
+
+/* Medium */
+
+.severity-medium,
+.severity.medium {
+  background: #fff5cf;
+
+  color: #b77900;
+}
+
+
+/* Low */
+
+.severity-low,
+.severity.low {
+  background: #e8f7ec;
+
+  color: #16803c;
+}
+
+
+/* =========================================================
+   STATUS BADGES
+   ========================================================= */
+
+.status-badge,
+.status {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  min-width: 65px;
+
+  padding: 5px 10px;
+
+  border-radius: 7px;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  line-height: 1.2;
+}
+
+
+/* Pending */
+
+.status-pending,
+.status.pending {
+  background: #fff0d5;
+
+  color: #c77b00;
+}
+
+
+/* Assigned */
+
+.status-assigned,
+.status.assigned {
+  background: #e5efff;
+
+  color: #3974c6;
+}
+
+
+/* Completed */
+
+.status-completed,
+.status.completed {
+  background: #e4f7ea;
+
+  color: #16803c;
+}
+
+
+/* =========================================================
+   NOT ASSIGNED
+   ========================================================= */
+
+.not-assigned,
+.unassigned {
+  color: #999999;
+
+  font-style: italic;
+
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   COMPLETE BUTTON
+   ========================================================= */
+
+.complete-button {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  min-width: 88px;
+  height: 34px;
+
+  padding: 0 13px;
+
+  border: 1px solid #e5252a;
+
+  border-radius: 7px;
+
+  background: #ffffff;
+
+  color: #e5252a;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.complete-button:hover {
+  background: #e5252a;
+
+  color: #ffffff;
+
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 5px 14px rgba(229, 37, 42, 0.18);
+}
+
+.complete-button:active {
+  transform: translateY(0);
+}
+
+.complete-button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+
+  transform: none;
+
+  box-shadow: none;
+}
+
+
+/* =========================================================
+   COMPLETED TEXT
+   ========================================================= */
+
+.completed-text {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 5px;
+
+  color: #16803c;
+
+  font-size: 11px;
+
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   LOADING
+   ========================================================= */
+
+.emergencies-loading {
+  min-height: 60vh;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+
+  color: #555555;
+
+  text-align: center;
+}
+
+.emergencies-loading h2 {
+  margin: 0;
+
+  color: #222222;
+
+  font-size: 20px;
+}
+
+.emergencies-loading p {
+  margin: 0;
+
+  color: #888888;
+
+  font-size: 13px;
+}
+
+
+/* =========================================================
+   ERROR
+   ========================================================= */
+
+.emergencies-error {
+  margin: 30px;
+
+  padding: 24px;
+
+  border: 1px solid #ffd1d1;
+
+  border-radius: 12px;
+
+  background: #fff5f5;
+
+  text-align: center;
+}
+
+.emergencies-error h2 {
+  margin: 0 0 8px;
+
+  color: #c62828;
+
+  font-size: 20px;
+}
+
+.emergencies-error p {
+  margin: 0 0 18px;
+
+  color: #777777;
+
+  font-size: 13px;
+}
+
+
+/* =========================================================
+   EMPTY STATE
+   ========================================================= */
+
+.empty-state {
+  padding: 55px 20px;
+
+  text-align: center;
+
+  color: #888888;
+}
+
+.empty-state-icon {
+  margin-bottom: 12px;
+
+  font-size: 36px;
+}
+
+.empty-state h3 {
+  margin: 0 0 7px;
+
+  color: #333333;
+
+  font-size: 17px;
+}
+
+.empty-state p {
+  margin: 0;
+
+  color: #999999;
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   REFRESH / FILTER AREA
+   ========================================================= */
+
+.emergency-controls {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  margin-bottom: 20px;
+}
+
+.emergency-search {
+  flex: 1;
+
+  max-width: 360px;
+
+  height: 40px;
+
+  padding: 0 13px;
+
+  border: 1px solid #dddddd;
+
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #333333;
+
+  font-size: 13px;
+
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.emergency-search:focus {
+  border-color: #e5252a;
+
+  box-shadow:
+    0 0 0 3px rgba(229, 37, 42, 0.08);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1200px) {
+  .emergency-stats,
+  .stats-grid,
+  .stats-container {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .emergencies-header,
+  .page-header {
+    padding: 22px 20px;
+
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+
+  .emergencies-content {
+    padding: 22px 20px 32px;
+  }
+
+  .emergency-stats,
+  .stats-grid,
+  .stats-container {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .emergency-table th,
+  .emergencies-table th,
+  .emergency-table td,
+  .emergencies-table td {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .emergencies-header h1,
+  .page-header h1 {
+    font-size: 24px;
+  }
+
+  .emergency-stats,
+  .stats-grid,
+  .stats-container {
+    grid-template-columns: 1fr;
+  }
+
+  .emergency-stat-card,
+  .stat-card {
+    min-height: 105px;
+
+    padding: 18px;
+  }
+
+  .emergencies-content {
+    padding: 18px 14px 28px;
+  }
+
+  .emergencies-section-header,
+  .table-header,
+  .emergencies-table-header {
+    padding: 18px;
+  }
+
+  .refresh-button {
+    width: 100%;
+  }
+}
+
+
+/* =========================================================
+   SMOOTH SCROLLING
+   ========================================================= */
+
+.emergencies-page {
+  scroll-behavior: smooth;
+}
+
+
+/* =========================================================
+   SUBTLE ANIMATION
+   ========================================================= */
+
+@keyframes emergencyCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.emergency-stat-card,
+.stat-card {
+  animation: emergencyCardIn 0.35s ease both;
+}
+
+.emergency-stat-card:nth-child(2),
+.stat-card:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+.emergency-stat-card:nth-child(3),
+.stat-card:nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+.emergency-stat-card:nth-child(4),
+.stat-card:nth-child(4) {
+  animation-delay: 0.12s;
+}
+
+.emergency-stat-card:nth-child(5),
+.stat-card:nth-child(5) {
+  animation-delay: 0.16s;
+}
+
+/* =========================================================
+   STAT LABEL + COUNT SPACING
+   ========================================================= */
+
+.emergency-stats > div,
+.stats-grid > div,
+.stats-container > div {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+/* Label */
+.emergency-stats > div > p,
+.stats-grid > div > p,
+.stats-container > div > p {
+  display: inline-block !important;
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #555 !important;
+}
+
+/* Number */
+.emergency-stats > div > strong,
+.stats-grid > div > strong,
+.stats-container > div > strong,
+.emergency-stats > div > h3,
+.stats-grid > div > h3,
+.stats-container > div > h3 {
+  display: inline-block !important;
+  margin: 0 !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  color: #111 !important;
+}

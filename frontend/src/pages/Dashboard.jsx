@@ -7,14 +7,24 @@ function Dashboard() {
   const [error, setError] = useState("");
 
   // =========================
+  // NAVIGATION
+  // =========================
+
+  const navigateTo = (path) => {
+    window.location.assign(path);
+  };
+
+  // =========================
   // LOGOUT
   // =========================
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("token");
+    localStorage.removeItem("user_role");
+    localStorage.removeItem("user_email");
 
-    window.location.href = "/";
+    window.location.assign("/");
   };
 
   // =========================
@@ -27,7 +37,6 @@ function Dashboard() {
         setLoading(true);
         setError("");
 
-        // Get JWT token saved during login
         const token =
           localStorage.getItem("access_token") ||
           localStorage.getItem("token");
@@ -51,7 +60,9 @@ function Dashboard() {
 
         if (!response.ok) {
           if (response.status === 401) {
-            throw new Error("Session expired. Please login again.");
+            throw new Error(
+              "Session expired. Please login again."
+            );
           }
 
           if (response.status === 403) {
@@ -60,7 +71,9 @@ function Dashboard() {
             );
           }
 
-          throw new Error("Failed to load dashboard data.");
+          throw new Error(
+            "Failed to load dashboard data."
+          );
         }
 
         const data = await response.json();
@@ -78,7 +91,7 @@ function Dashboard() {
   }, []);
 
   // =========================
-  // LOADING STATE
+  // LOADING
   // =========================
 
   if (loading) {
@@ -91,14 +104,34 @@ function Dashboard() {
   }
 
   // =========================
-  // ERROR STATE
+  // ERROR
   // =========================
 
   if (error) {
     return (
       <div className="dashboard-error">
         <h2>Unable to load dashboard</h2>
+
         <p>{error}</p>
+
+        <button
+          onClick={() => window.location.reload()}
+          className="login-button"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  // =========================
+  // SAFETY CHECK
+  // =========================
+
+  if (!dashboardData) {
+    return (
+      <div className="dashboard-error">
+        <h2>No dashboard data available</h2>
 
         <button
           onClick={() => window.location.reload()}
@@ -113,10 +146,6 @@ function Dashboard() {
   const emergencies = dashboardData.emergencies;
   const ambulances = dashboardData.ambulances;
   const hospitals = dashboardData.hospitals;
-
-  // =========================
-  // AMBULANCE PERCENTAGES
-  // =========================
 
   const totalAmbulances =
     ambulances.available + ambulances.busy;
@@ -140,48 +169,113 @@ function Dashboard() {
 
       <aside className="sidebar">
 
+        {/* BRAND */}
+
         <div className="sidebar-brand">
-          <div className="sidebar-logo">✚</div>
-          <span>RapidResQ</span>
+
+          <div className="sidebar-logo">
+            ✚
+          </div>
+
+          <span>
+            RapidResQ
+          </span>
+
         </div>
+
+
+        {/* =========================
+            MAIN NAVIGATION
+        ========================= */}
 
         <nav className="sidebar-nav">
 
-          <button className="nav-item active">
+          {/* DASHBOARD */}
+
+          <button
+            type="button"
+            className="nav-item active"
+            onClick={() => navigateTo("/dashboard")}
+          >
             <span>▦</span>
             Dashboard
           </button>
 
-          <button className="nav-item">
+
+          {/* EMERGENCIES */}
+
+          <button
+            type="button"
+            className="nav-item"
+            onClick={() => navigateTo("/emergencies")}
+          >
             <span>🚨</span>
             Emergencies
           </button>
 
-          <button className="nav-item">
+
+          {/* AMBULANCES */}
+
+          <button
+            type="button"
+            className="nav-item"
+            onClick={() => navigateTo("/ambulances")}
+          >
             <span>🚑</span>
             Ambulances
           </button>
 
-          <button className="nav-item">
+
+          {/* HOSPITALS */}
+
+          <button
+            type="button"
+            className="nav-item"
+            onClick={() => navigateTo("/hospitals")}
+          >
             <span>🏥</span>
             Hospitals
           </button>
 
-          <button className="nav-item">
+
+          {/* USERS */}
+
+          <button
+            type="button"
+            className="nav-item"
+            onClick={() => navigateTo("/users")}
+          >
             <span>👥</span>
             Users
           </button>
 
         </nav>
 
+
+        {/* =========================
+            BOTTOM NAVIGATION
+        ========================= */}
+
         <div className="sidebar-bottom">
 
-          <button className="nav-item">
+          {/* SETTINGS */}
+
+          <button
+            type="button"
+            className="nav-item"
+            onClick={() => {
+              console.log("Settings page coming soon.");
+            }}
+          >
             <span>⚙</span>
             Settings
           </button>
 
+
+          {/* LOGOUT */}
+
           <button
+            type="button"
             className="nav-item logout"
             onClick={handleLogout}
           >
@@ -200,14 +294,26 @@ function Dashboard() {
 
       <main className="dashboard-main">
 
-        {/* Header */}
+        {/* =========================
+            HEADER
+        ========================= */}
 
         <header className="dashboard-header">
 
           <div>
-            <h1>Dashboard</h1>
-            <p>Real-time emergency response overview</p>
+
+            <h1>
+              Dashboard
+            </h1>
+
+            <p>
+              Real-time emergency response overview
+            </p>
+
           </div>
+
+
+          {/* ADMIN PROFILE */}
 
           <div className="admin-profile">
 
@@ -220,8 +326,15 @@ function Dashboard() {
             </div>
 
             <div className="profile-info">
-              <strong>Admin</strong>
-              <span>Administrator</span>
+
+              <strong>
+                Admin
+              </strong>
+
+              <span>
+                Administrator
+              </span>
+
             </div>
 
           </div>
@@ -230,7 +343,7 @@ function Dashboard() {
 
 
         {/* =========================
-            WELCOME
+            WELCOME SECTION
         ========================= */}
 
         <section className="welcome-section">
@@ -242,14 +355,19 @@ function Dashboard() {
             </h2>
 
             <p>
-              Here's what's happening with RapidResQ right now.
+              Here's what's happening with
+              RapidResQ right now.
             </p>
 
           </div>
 
+
           <div className="live-status">
+
             <span></span>
+
             System operational
+
           </div>
 
         </section>
@@ -261,7 +379,7 @@ function Dashboard() {
 
         <section className="stats-grid">
 
-          {/* Total Emergencies */}
+          {/* TOTAL EMERGENCIES */}
 
           <div className="stat-card">
 
@@ -271,7 +389,9 @@ function Dashboard() {
 
             <div>
 
-              <p>Total Emergencies</p>
+              <p>
+                Total Emergencies
+              </p>
 
               <h3>
                 {emergencies.total}
@@ -286,7 +406,7 @@ function Dashboard() {
           </div>
 
 
-          {/* Pending */}
+          {/* PENDING */}
 
           <div className="stat-card">
 
@@ -296,7 +416,9 @@ function Dashboard() {
 
             <div>
 
-              <p>Pending</p>
+              <p>
+                Pending
+              </p>
 
               <h3>
                 {emergencies.pending}
@@ -311,7 +433,7 @@ function Dashboard() {
           </div>
 
 
-          {/* Assigned */}
+          {/* ASSIGNED */}
 
           <div className="stat-card">
 
@@ -321,7 +443,9 @@ function Dashboard() {
 
             <div>
 
-              <p>Assigned</p>
+              <p>
+                Assigned
+              </p>
 
               <h3>
                 {emergencies.assigned}
@@ -336,7 +460,7 @@ function Dashboard() {
           </div>
 
 
-          {/* Completed */}
+          {/* COMPLETED */}
 
           <div className="stat-card">
 
@@ -346,7 +470,9 @@ function Dashboard() {
 
             <div>
 
-              <p>Completed</p>
+              <p>
+                Completed
+              </p>
 
               <h3>
                 {emergencies.completed}
@@ -364,10 +490,11 @@ function Dashboard() {
 
 
         {/* =========================
-            MAIN DASHBOARD GRID
+            MAIN GRID
         ========================= */}
 
         <section className="dashboard-grid">
+
 
           {/* =========================
               EMERGENCY OVERVIEW
@@ -389,7 +516,14 @@ function Dashboard() {
 
               </div>
 
-              <button className="view-all">
+
+              {/* VIEW ALL */}
+
+              <button
+                type="button"
+                className="view-all"
+                onClick={() => navigateTo("/emergencies")}
+              >
                 View all →
               </button>
 
@@ -398,7 +532,8 @@ function Dashboard() {
 
             <div className="emergency-list">
 
-              {/* Total */}
+
+              {/* TOTAL */}
 
               <div className="emergency-row">
 
@@ -429,7 +564,7 @@ function Dashboard() {
               </div>
 
 
-              {/* Pending */}
+              {/* PENDING */}
 
               <div className="emergency-row">
 
@@ -460,7 +595,7 @@ function Dashboard() {
               </div>
 
 
-              {/* Critical */}
+              {/* CRITICAL */}
 
               <div className="emergency-row">
 
@@ -491,7 +626,7 @@ function Dashboard() {
               </div>
 
 
-              {/* Completed */}
+              {/* COMPLETED */}
 
               <div className="emergency-row">
 
@@ -549,7 +684,7 @@ function Dashboard() {
             </div>
 
 
-            {/* Available */}
+            {/* AVAILABLE */}
 
             <div className="ambulance-stat">
 
@@ -565,6 +700,7 @@ function Dashboard() {
 
               </div>
 
+
               <div className="progress-bar">
 
                 <div
@@ -579,7 +715,7 @@ function Dashboard() {
             </div>
 
 
-            {/* Busy */}
+            {/* BUSY */}
 
             <div className="ambulance-stat">
 
@@ -595,6 +731,7 @@ function Dashboard() {
 
               </div>
 
+
               <div className="progress-bar">
 
                 <div
@@ -609,7 +746,7 @@ function Dashboard() {
             </div>
 
 
-            {/* Fleet Summary */}
+            {/* TOTAL FLEET */}
 
             <div className="ambulance-stat">
 
@@ -624,6 +761,7 @@ function Dashboard() {
                 </strong>
 
               </div>
+
 
               <div className="progress-bar">
 
@@ -649,7 +787,8 @@ function Dashboard() {
 
         <section className="bottom-grid">
 
-          {/* Hospitals */}
+
+          {/* HOSPITALS */}
 
           <div className="small-card">
 
@@ -676,7 +815,7 @@ function Dashboard() {
           </div>
 
 
-          {/* Available Beds */}
+          {/* AVAILABLE BEDS */}
 
           <div className="small-card">
 
@@ -703,7 +842,7 @@ function Dashboard() {
           </div>
 
 
-          {/* Critical Cases */}
+          {/* CRITICAL CASES */}
 
           <div className="small-card">
 
