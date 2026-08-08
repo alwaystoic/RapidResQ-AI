@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -13,9 +13,6 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
-    print("===== get_current_user CALLED =====")
-    print(credentials)
-
     token = credentials.credentials
 
     payload = verify_access_token(token)
@@ -47,8 +44,8 @@ def require_role(required_role: str):
     ):
         if current_user.role != required_role:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied"
+                status_code=403,
+                detail="Insufficient permissions"
             )
 
         return current_user

@@ -1,31 +1,63 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.database.database import engine, Base
 
-# Import models
+# ==========================
+# Import Models
+# ==========================
+
 from backend.models.ambulance import Ambulance
 from backend.models.hospital import Hospital
 from backend.models.emergency import Emergency
 from backend.models.user import User
 
-# Import routers
+# ==========================
+# Import Routers
+# ==========================
+
 from backend.routers import ambulance
 from backend.routers import hospital
 from backend.routers import emergency
 from backend.routers import user
 from backend.routers import dashboard
 
-# Import authentication router
+# ==========================
+# Import Authentication Router
+# ==========================
+
 from backend.auth import auth
 
-# Create database tables
+# ==========================
+# Create Database Tables
+# ==========================
+
 Base.metadata.create_all(bind=engine)
+
+# ==========================
+# Create FastAPI App
+# ==========================
 
 app = FastAPI(
     title="RapidResQ API",
     version="1.0.0",
     description="AI-powered Emergency Response System"
+)
+
+# ==========================
+# CORS CONFIGURATION
+# ==========================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ==========================
@@ -65,6 +97,7 @@ def custom_openapi():
     )
 
     schema.setdefault("components", {})
+
     schema["components"]["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
@@ -73,16 +106,19 @@ def custom_openapi():
         }
     }
 
-    # Add security to EVERY operation
+    # Add JWT security to every operation
     for path in schema["paths"].values():
         for operation in path.values():
-            operation["security"] = [
-                {
-                    "BearerAuth": []
-                }
-            ]
+            if isinstance(operation, dict):
+                operation["security"] = [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
 
     app.openapi_schema = schema
+
     return schema
+
 
 app.openapi = custom_openapi

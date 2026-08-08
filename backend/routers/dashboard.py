@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from backend.database.database import get_db
-
 from backend.auth.dependencies import require_role
-from backend.models.user import User
 
+from backend.models.user import User
 from backend.models.emergency import Emergency
 from backend.models.ambulance import Ambulance
 from backend.models.hospital import Hospital
 
+
 router = APIRouter(
     tags=["Dashboard"]
 )
+
 
 @router.get("/dashboard/admin")
 def admin_dashboard(
@@ -20,19 +22,39 @@ def admin_dashboard(
     current_user: User = Depends(require_role("Admin"))
 ):
 
+    # ==========================
+    # Emergency Statistics
+    # ==========================
+
     total_emergencies = db.query(Emergency).count()
 
-    pending_emergencies = (
+    pending_cases = (
         db.query(Emergency)
         .filter(Emergency.status == "Pending")
         .count()
     )
 
-    assigned_emergencies = (
+    assigned_cases = (
         db.query(Emergency)
         .filter(Emergency.status == "Assigned")
         .count()
     )
+
+    completed_cases = (
+        db.query(Emergency)
+        .filter(Emergency.status == "Completed")
+        .count()
+    )
+
+    critical_cases = (
+        db.query(Emergency)
+        .filter(Emergency.severity == "Critical")
+        .count()
+    )
+
+    # ==========================
+    # Ambulance Statistics
+    # ==========================
 
     available_ambulances = (
         db.query(Ambulance)
@@ -46,58 +68,10 @@ def admin_dashboard(
         .count()
     )
 
-    total_available_beds = (
-        db.query(Hospital)
-        .with_entities(Hospital.available_beds)
-        .all()
-    )
-
-    beds = sum(bed[0] for bed in total_available_beds)
-
-    return {
-        "total_emergencies": total_emergencies,
-        "pending_emergencies": pending_emergencies,
-        "assigned_emergencies": assigned_emergencies,
-        "available_ambulances": available_ambulances,
-        "busy_ambulances": busy_ambulances,
-        "available_hospital_beds": beds
-    }
-
-@router.get("/dashboard")
-def dashboard(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
-):
-
-    # Emergency Statistics
-    total_emergencies = db.query(Emergency).count()
-
-    pending_cases = db.query(Emergency).filter(
-        Emergency.status == "Pending"
-    ).count()
-
-    assigned_cases = db.query(Emergency).filter(
-        Emergency.status == "Assigned"
-    ).count()
-
-    completed_cases = db.query(Emergency).filter(
-        Emergency.status == "Completed"
-    ).count()
-
-    critical_cases = db.query(Emergency).filter(
-        Emergency.severity == "Critical"
-    ).count()
-
-    # Ambulance Statistics
-    available_ambulances = db.query(Ambulance).filter(
-        Ambulance.status == "Available"
-    ).count()
-
-    busy_ambulances = db.query(Ambulance).filter(
-        Ambulance.status == "Busy"
-    ).count()
-
+    # ==========================
     # Hospital Statistics
+    # ==========================
+
     total_hospitals = db.query(Hospital).count()
 
     available_hospital_beds = (
