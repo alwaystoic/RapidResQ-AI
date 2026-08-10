@@ -1104,3 +1104,372 @@
   font-weight: 700 !important;
   color: #111 !important;
 }
+
+/* =========================================================
+   RAPIDRESQ - EMERGENCIES PAGE VISUAL ENHANCEMENT
+   ADD THIS AT THE VERY BOTTOM
+   ========================================================= */
+
+
+/* =========================================================
+   STATISTIC CARDS
+   ========================================================= */
+
+.stats-grid > div,
+.emergency-stats > div,
+.stats-container > div {
+  position: relative;
+  overflow: hidden;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+
+/* Colored top accent */
+
+.stats-grid > div::before,
+.emergency-stats > div::before,
+.stats-container > div::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 4px;
+}
+
+
+/* Total Emergencies */
+
+.stats-grid > div:nth-child(1),
+.emergency-stats > div:nth-child(1),
+.stats-container > div:nth-child(1) {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #fff7f7 100%
+  );
+
+  border-color: #f3c5c8 !important;
+}
+
+.stats-grid > div:nth-child(1)::before,
+.emergency-stats > div:nth-child(1)::before,
+.stats-container > div:nth-child(1)::before {
+  background: #e5252a;
+}
+
+.stats-grid > div:nth-child(1) h3,
+.stats-grid > div:nth-child(1) strong {
+  color: #e5252a !important;
+}
+
+
+/* Pending */
+
+.stats-grid > div:nth-child(2),
+.emergency-stats > div:nth-child(2),
+.stats-container > div:nth-child(2) {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #fffaf1 100%
+  );
+
+  border-color: #f1d49d !important;
+}
+
+.stats-grid > div:nth-child(2)::before,
+.emergency-stats > div:nth-child(2)::before,
+.stats-container > div:nth-child(2)::before {
+  background: #f59e0b;
+}
+
+.stats-grid > div:nth-child(2) h3,
+.stats-grid > div:nth-child(2) strong {
+  color: #d97706 !important;
+}
+
+
+/* Assigned */
+
+.stats-grid > div:nth-child(3),
+.emergency-stats > div:nth-child(3),
+.stats-container > div:nth-child(3) {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #f5f9ff 100%
+  );
+
+  border-color: #cbdcf5 !important;
+}
+
+.stats-grid > div:nth-child(3)::before,
+.emergency-stats > div:nth-child(3)::before,
+.stats-container > div:nth-child(3)::before {
+  background: #3b82f6;
+}
+
+.stats-grid > div:nth-child(3) h3,
+.stats-grid > div:nth-child(3) strong {
+  color: #2563eb !important;
+}
+
+
+/* Critical */
+
+.stats-grid > div:nth-child(4),
+.emergency-stats > div:nth-child(4),
+.stats-container > div:nth-child(4) {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #fff4f4 100%
+  );
+
+  border-color: #f2bfc2 !important;
+}
+
+.stats-grid > div:nth-child(4)::before,
+.emergency-stats > div:nth-child(4)::before,
+.stats-container > div:nth-child(4)::before {
+  background: #dc2626;
+}
+
+.stats-grid > div:nth-child(4) h3,
+.stats-grid > div:nth-child(4) strong {
+  color: #dc2626 !important;
+}
+
+
+/* Completed */
+
+.stats-grid > div:nth-child(5),
+.emergency-stats > div:nth-child(5),
+.stats-container > div:nth-child(5) {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #f3fcf6 100%
+  );
+
+  border-color: #c7e8d2 !important;
+}
+
+.stats-grid > div:nth-child(5)::before,
+.emergency-stats > div:nth-child(5)::before,
+.stats-container > div:nth-child(5)::before {
+  background: #22c55e;
+}
+
+.stats-grid > div:nth-child(5) h3,
+.stats-grid > div:nth-child(5) strong {
+  color: #16a34a !important;
+}
+
+
+/* Card hover */
+
+.stats-grid > div:hover,
+.emergency-stats > div:hover,
+.stats-container > div:hover {
+  transform: translateY(-5px);
+
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.09);
+}
+
+
+/* =========================================================
+   STAT ICONS
+   ========================================================= */
+
+.stats-grid > div:nth-child(1) .stat-icon,
+.emergency-stats > div:nth-child(1) .stat-icon {
+  background: #ffe8e8 !important;
+}
+
+.stats-grid > div:nth-child(2) .stat-icon,
+.emergency-stats > div:nth-child(2) .stat-icon {
+  background: #fff0d2 !important;
+}
+
+.stats-grid > div:nth-child(3) .stat-icon,
+.emergency-stats > div:nth-child(3) .stat-icon {
+  background: #e7f0ff !important;
+}
+
+.stats-grid > div:nth-child(4) .stat-icon,
+.emergency-stats > div:nth-child(4) .stat-icon {
+  background: #ffe5e5 !important;
+}
+
+.stats-grid > div:nth-child(5) .stat-icon,
+.emergency-stats > div:nth-child(5) .stat-icon {
+  background: #e5f8eb !important;
+}
+
+
+/* =========================================================
+   ALL EMERGENCIES SECTION
+   ========================================================= */
+
+.emergencies-section,
+.emergencies-table-card,
+.emergency-table-card {
+  box-shadow:
+    0 5px 20px rgba(0, 0, 0, 0.045);
+
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
+}
+
+.emergencies-section:hover,
+.emergencies-table-card:hover,
+.emergency-table-card:hover {
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.07);
+}
+
+
+/* =========================================================
+   TABLE HEADER
+   ========================================================= */
+
+.emergency-table thead,
+.emergencies-table thead {
+  background: linear-gradient(
+    180deg,
+    #fafafa 0%,
+    #f5f6f8 100%
+  );
+}
+
+.emergency-table th,
+.emergencies-table th {
+  color: #555555;
+
+  letter-spacing: 0.03em;
+}
+
+
+/* =========================================================
+   TABLE ROWS
+   ========================================================= */
+
+.emergency-table tbody tr,
+.emergencies-table tbody tr {
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.emergency-table tbody tr:hover,
+.emergencies-table tbody tr:hover {
+  background: #fffafa;
+
+  box-shadow:
+    inset 3px 0 0 #e5252a;
+}
+
+
+/* =========================================================
+   PATIENT NAME
+   ========================================================= */
+
+.patient-name {
+  transition: color 0.2s ease;
+}
+
+.emergency-table tbody tr:hover .patient-name,
+.emergencies-table tbody tr:hover .patient-name {
+  color: #e5252a;
+}
+
+
+/* =========================================================
+   STATUS BADGES - SLIGHTLY MORE VISUAL
+   ========================================================= */
+
+.status-pending,
+.status.pending {
+  box-shadow:
+    0 2px 6px rgba(245, 158, 11, 0.12);
+}
+
+.status-assigned,
+.status.assigned {
+  box-shadow:
+    0 2px 6px rgba(59, 130, 246, 0.12);
+}
+
+.status-completed,
+.status.completed {
+  box-shadow:
+    0 2px 6px rgba(34, 197, 94, 0.12);
+}
+
+
+/* =========================================================
+   SEVERITY BADGES
+   ========================================================= */
+
+.severity-critical,
+.severity.critical {
+  box-shadow:
+    0 2px 7px rgba(220, 38, 38, 0.15);
+}
+
+.severity-high,
+.severity.high {
+  box-shadow:
+    0 2px 7px rgba(217, 119, 6, 0.12);
+}
+
+.severity-medium,
+.severity.medium {
+  box-shadow:
+    0 2px 7px rgba(183, 121, 0, 0.10);
+}
+
+
+/* =========================================================
+   COMPLETE BUTTON
+   ========================================================= */
+
+.complete-button {
+  transition:
+    all 0.2s ease;
+}
+
+.complete-button:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 7px 16px rgba(229, 37, 42, 0.22);
+}
+
+
+/* =========================================================
+   CASE COUNT
+   ========================================================= */
+
+.case-count,
+.cases-count {
+  background: #fff0f0;
+
+  color: #d71920;
+
+  border: 1px solid #ffd4d4;
+
+  box-shadow:
+    0 2px 6px rgba(229, 37, 42, 0.08);
+}

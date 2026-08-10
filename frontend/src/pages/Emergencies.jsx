@@ -10,6 +10,14 @@ function Emergencies() {
   const [completingId, setCompletingId] = useState(null);
 
   // ==========================================
+  // NAVIGATION
+  // ==========================================
+
+  const goToDashboard = () => {
+    window.location.assign("/dashboard");
+  };
+
+  // ==========================================
   // LOAD EMERGENCIES
   // ==========================================
 
@@ -248,11 +256,36 @@ function Emergencies() {
       <header className="emergencies-header">
 
         <div>
+
+          {/* BACK TO DASHBOARD */}
+          <button
+            type="button"
+            onClick={goToDashboard}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "14px",
+              padding: "9px 16px",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              background: "#ffffff",
+              color: "#374151",
+              fontSize: "14px",
+              fontWeight: "600",
+              cursor: "pointer",
+              boxShadow: "0 2px 6px rgba(0, 0, 0, 0.06)",
+            }}
+          >
+            ← Back to Dashboard
+          </button>
+
           <h1>Emergencies</h1>
 
           <p>
             Manage and monitor emergency cases
           </p>
+
         </div>
 
         <button
@@ -342,11 +375,15 @@ function Emergencies() {
         <div className="card-header">
 
           <div>
-            <h2>All Emergencies</h2>
+
+            <h2>
+              All Emergencies
+            </h2>
 
             <p>
               All reported emergency cases
             </p>
+
           </div>
 
           <span className="case-count">
@@ -364,7 +401,9 @@ function Emergencies() {
               🚨
             </div>
 
-            <h3>No emergencies found</h3>
+            <h3>
+              No emergencies found
+            </h3>
 
             <p>
               There are currently no emergency cases
