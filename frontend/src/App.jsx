@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Dashboard from "./pages/Dashboard";
 import Emergencies from "./pages/Emergencies";
 import Ambulances from "./pages/Ambulances";
+import Hospital from "./pages/Hospital";
 
 
 // ============================================================
@@ -584,10 +585,9 @@ function App() {
   ) {
 
     return (
-      <PlaceholderPage
-        title="Hospitals"
-        icon="🏥"
-        description="Hospital management will be developed next."
+      <Hospital
+        onLogout={handleLogout}
+        onNavigate={navigate}
       />
     );
   }

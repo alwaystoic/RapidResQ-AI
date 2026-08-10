@@ -82,11 +82,14 @@ def create_hospital(
     current_user: User = Depends(require_role("Admin"))
 ):
     new_hospital = Hospital(
-        name=hospital.name,
-        location=hospital.location,
-        contact=hospital.contact,
-        available_beds=hospital.available_beds
-    )
+    name=hospital.name,
+    location=hospital.location,
+    contact=hospital.contact,
+    available_beds=hospital.available_beds,
+    latitude=hospital.latitude,
+    longitude=hospital.longitude,
+    status=hospital.status
+)
 
     db.add(new_hospital)
     db.commit()
