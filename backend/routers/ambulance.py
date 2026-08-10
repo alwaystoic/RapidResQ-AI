@@ -83,10 +83,12 @@ def create_ambulance(
     current_user: User = Depends(require_role("Admin"))
 ):
     new_ambulance = Ambulance(
-        vehicle=ambulance.vehicle,
-        status=ambulance.status,
-        location=ambulance.location
-    )
+    vehicle=ambulance.vehicle,
+    status=ambulance.status,
+    location=ambulance.location,
+    latitude=ambulance.latitude,
+    longitude=ambulance.longitude
+)
 
     db.add(new_ambulance)
     db.commit()

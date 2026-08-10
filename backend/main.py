@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.database.database import engine, Base
 
+
 # ==========================
 # Import Models
 # ==========================
@@ -12,6 +13,7 @@ from backend.models.ambulance import Ambulance
 from backend.models.hospital import Hospital
 from backend.models.emergency import Emergency
 from backend.models.user import User
+
 
 # ==========================
 # Import Routers
@@ -23,17 +25,20 @@ from backend.routers import emergency
 from backend.routers import user
 from backend.routers import dashboard
 
+
 # ==========================
 # Import Authentication Router
 # ==========================
 
 from backend.auth import auth
 
+
 # ==========================
 # Create Database Tables
 # ==========================
 
 Base.metadata.create_all(bind=engine)
+
 
 # ==========================
 # Create FastAPI App
@@ -44,6 +49,7 @@ app = FastAPI(
     version="1.0.0",
     description="AI-powered Emergency Response System"
 )
+
 
 # ==========================
 # CORS CONFIGURATION
@@ -60,6 +66,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ==========================
 # Include Routers
 # ==========================
@@ -71,6 +78,7 @@ app.include_router(user.router)
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 
+
 # ==========================
 # Home Route
 # ==========================
@@ -80,6 +88,7 @@ def home():
     return {
         "message": "Welcome to RapidResQ AI 🚑"
     }
+
 
 # ==========================
 # Swagger JWT Authentication

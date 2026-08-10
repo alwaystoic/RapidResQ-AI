@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Dashboard from "./pages/Dashboard";
 import Emergencies from "./pages/Emergencies";
+import Ambulances from "./pages/Ambulances";
 
 
 // ============================================================
@@ -564,18 +565,14 @@ function App() {
   // AMBULANCES
   // ==========================================================
 
-  if (
-    currentPath === "/ambulances"
-  ) {
-
-    return (
-      <PlaceholderPage
-        title="Ambulances"
-        icon="🚑"
-        description="Ambulance management will be developed next."
-      />
-    );
-  }
+  if (currentPath === "/ambulances") {
+  return (
+    <Ambulances
+      onLogout={handleLogout}
+      onNavigate={navigate}
+    />
+  );
+}
 
 
   // ==========================================================
