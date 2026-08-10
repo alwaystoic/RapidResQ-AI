@@ -3,6 +3,7 @@ import Dashboard from "./pages/Dashboard";
 import Emergencies from "./pages/Emergencies";
 import Ambulances from "./pages/Ambulances";
 import Hospital from "./pages/Hospital";
+import Users from "./pages/Users";
 
 
 // ============================================================
@@ -597,18 +598,21 @@ function App() {
   // USERS
   // ==========================================================
 
-  if (
-    currentPath === "/users"
-  ) {
+// ==========================================================
+// USERS
+// ==========================================================
 
-    return (
-      <PlaceholderPage
-        title="Users"
-        icon="👥"
-        description="User management will be developed next."
-      />
-    );
-  }
+if (
+  currentPath === "/users"
+) {
+
+  return (
+    <Users
+      onLogout={handleLogout}
+      onNavigate={navigate}
+    />
+  );
+}
 
 
   // ==========================================================
