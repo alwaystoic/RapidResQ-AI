@@ -4,18 +4,25 @@ from backend.models.hospital import Hospital
 from backend.utils.distance import haversine_distance
 
 
-def assign_hospital(
+def find_nearest_hospital(
     db: Session,
     emergency_latitude: float,
     emergency_longitude: float
 ):
     """
-    Assign the nearest hospital that has available beds.
+    Find the nearest available hospital that has at least one
+    available bed.
+
+    This function only finds the hospital.
+    It does NOT modify the database or commit a transaction.
     """
 
     available_hospitals = (
         db.query(Hospital)
-        .filter(Hospital.available_beds > 0)
+        .filter(
+            Hospital.status == "Available",
+            Hospital.available_beds > 0
+        )
         .all()
     )
 
@@ -37,10 +44,5 @@ def assign_hospital(
         if distance < shortest_distance:
             shortest_distance = distance
             nearest = hospital
-
-    nearest.available_beds -= 1
-
-    db.commit()
-    db.refresh(nearest)
 
     return nearest

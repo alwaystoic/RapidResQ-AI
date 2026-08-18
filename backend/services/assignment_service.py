@@ -4,13 +4,16 @@ from backend.models.ambulance import Ambulance
 from backend.utils.distance import haversine_distance
 
 
-def assign_ambulance(
+def find_nearest_ambulance(
     db: Session,
     emergency_latitude: float,
     emergency_longitude: float
 ):
     """
-    Assign the nearest available ambulance.
+    Find the nearest available ambulance.
+
+    This function only finds the ambulance.
+    It does NOT modify the database or commit a transaction.
     """
 
     available_ambulances = (
@@ -37,10 +40,5 @@ def assign_ambulance(
         if distance < shortest_distance:
             shortest_distance = distance
             nearest = ambulance
-
-    nearest.status = "Busy"
-
-    db.commit()
-    db.refresh(nearest)
 
     return nearest

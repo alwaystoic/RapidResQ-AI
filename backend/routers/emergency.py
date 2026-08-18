@@ -16,8 +16,8 @@ from backend.auth.dependencies import get_current_user
 from backend.auth.roles import require_role
 
 from backend.services.ai_service import predict_severity
-from backend.services.assignment_service import assign_ambulance
-from backend.services.hospital_assignment import assign_hospital
+from backend.services.assignment_service import find_nearest_ambulance
+from backend.services.hospital_assignment import find_nearest_hospital
 
 from backend.routers.ambulance import ambulance_response
 from backend.routers.hospital import hospital_response
@@ -72,63 +72,130 @@ def create_emergency(
     current_user: User = Depends(get_current_user)
 ):
 
-    # AI Severity Prediction
-    severity = predict_severity(emergency.emergency_type)
+    try:
 
-    # Automatic Ambulance Assignment
-    assigned_ambulance = assign_ambulance(
-        db,
-        emergency.latitude,
-        emergency.longitude
-    )
+        # ==========================================
+        # 1. AI SEVERITY PREDICTION
+        # ==========================================
 
-    # Automatic Hospital Assignment
-    assigned_hospital = assign_hospital(
-        db,
-        emergency.latitude,
-        emergency.longitude
-    )
+        severity = predict_severity(
+            emergency.emergency_type
+        )
 
-    # Emergency Status
-    if assigned_ambulance and assigned_hospital:
-        emergency_status = "Assigned"
-    else:
-        emergency_status = "Pending"
+        # ==========================================
+        # 2. FIND NEAREST AVAILABLE AMBULANCE
+        # ==========================================
 
-    new_emergency = Emergency(
-        patient_name=emergency.patient_name,
-        phone=emergency.phone,
-        emergency_type=emergency.emergency_type,
-        location=emergency.location,
+        assigned_ambulance = find_nearest_ambulance(
+            db,
+            emergency.latitude,
+            emergency.longitude
+        )
 
-        latitude=emergency.latitude,
-        longitude=emergency.longitude,
+        # ==========================================
+        # 3. FIND NEAREST AVAILABLE HOSPITAL
+        # ==========================================
 
-        severity=severity,
-        status=emergency_status,
+        assigned_hospital = find_nearest_hospital(
+            db,
+            emergency.latitude,
+            emergency.longitude
+        )
 
-        user_id=current_user.id,
+        # ==========================================
+        # 4. DETERMINE EMERGENCY STATUS
+        # ==========================================
 
-        ambulance_id=assigned_ambulance.id if assigned_ambulance else None,
-        hospital_id=assigned_hospital.id if assigned_hospital else None
-    )
+        if assigned_ambulance and assigned_hospital:
+            emergency_status = "Assigned"
+        else:
+            emergency_status = "Pending"
 
-    db.add(new_emergency)
-    db.commit()
-    db.refresh(new_emergency)
+        # ==========================================
+        # 5. RESERVE AMBULANCE
+        # ==========================================
 
-    return {
-        "message": "Emergency created successfully",
-        "ambulance": (
-            ambulance_response(assigned_ambulance)
-            if assigned_ambulance else None
-        ),
-        "hospital": (
-            hospital_response(assigned_hospital)
-            if assigned_hospital else None
-        ),
-        "data": emergency_response(new_emergency)
-    }   
+        if assigned_ambulance:
+            assigned_ambulance.status = "Busy"
+
+        # ==========================================
+        # 6. RESERVE HOSPITAL BED
+        # ==========================================
+
+        if assigned_hospital:
+            assigned_hospital.available_beds -= 1
+
+        # ==========================================
+        # 7. CREATE EMERGENCY
+        # ==========================================
+
+        new_emergency = Emergency(
+            patient_name=emergency.patient_name,
+            phone=emergency.phone,
+            emergency_type=emergency.emergency_type,
+            location=emergency.location,
+
+            latitude=emergency.latitude,
+            longitude=emergency.longitude,
+
+            severity=severity,
+            status=emergency_status,
+
+            user_id=current_user.id,
+
+            ambulance_id=(
+                assigned_ambulance.id
+                if assigned_ambulance
+                else None
+            ),
+
+            hospital_id=(
+                assigned_hospital.id
+                if assigned_hospital
+                else None
+            )
+        )
+
+        db.add(new_emergency)
+
+        # ==========================================
+        # 8. SINGLE DATABASE COMMIT
+        # ==========================================
+
+        db.commit()
+
+        db.refresh(new_emergency)
+
+        return {
+            "message": "Emergency created successfully",
+
+            "ambulance": (
+                ambulance_response(assigned_ambulance)
+                if assigned_ambulance
+                else None
+            ),
+
+            "hospital": (
+                hospital_response(assigned_hospital)
+                if assigned_hospital
+                else None
+            ),
+
+            "data": emergency_response(new_emergency)
+        }
+
+    except Exception as error:
+
+        # ==========================================
+        # ROLLBACK EVERYTHING ON FAILURE
+        # ==========================================
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Emergency creation failed: {str(error)}"
+        )   
 
 
 # ==========================================
