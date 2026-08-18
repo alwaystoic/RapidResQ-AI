@@ -22,8 +22,13 @@ from backend.services.hospital_assignment import find_nearest_hospital
 from backend.routers.ambulance import ambulance_response
 from backend.routers.hospital import hospital_response
 
+
 router = APIRouter()
 
+
+# ==========================================
+# EMERGENCY RESPONSE FORMAT
+# ==========================================
 
 def emergency_response(emergency):
     return {
@@ -42,7 +47,8 @@ def emergency_response(emergency):
 
 
 # ==========================================
-# GET ALL EMERGENCIES (Admin Only)
+# GET ALL EMERGENCIES
+# Admin Only
 # ==========================================
 
 @router.get("/emergencies")
@@ -55,8 +61,8 @@ def get_emergencies(
     return {
         "logged_in_as": current_user.email,
         "emergencies": [
-            emergency_response(e)
-            for e in emergencies
+            emergency_response(emergency)
+            for emergency in emergencies
         ]
     }
 
@@ -65,7 +71,10 @@ def get_emergencies(
 # CREATE EMERGENCY
 # ==========================================
 
-@router.post("/emergencies", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/emergencies",
+    status_code=status.HTTP_201_CREATED
+)
 def create_emergency(
     emergency: EmergencyCreate,
     db: Session = Depends(get_db),
@@ -112,21 +121,26 @@ def create_emergency(
             emergency_status = "Pending"
 
         # ==========================================
-        # 5. RESERVE AMBULANCE
+        # 5. RESERVE RESOURCES
+        #
+        # Only reserve resources when BOTH
+        # ambulance and hospital are available.
         # ==========================================
 
-        if assigned_ambulance:
+        if assigned_ambulance and assigned_hospital:
+
             assigned_ambulance.status = "Busy"
 
-        # ==========================================
-        # 6. RESERVE HOSPITAL BED
-        # ==========================================
-
-        if assigned_hospital:
             assigned_hospital.available_beds -= 1
 
+        else:
+
+            # Do not partially reserve resources
+            assigned_ambulance = None
+            assigned_hospital = None
+
         # ==========================================
-        # 7. CREATE EMERGENCY
+        # 6. CREATE EMERGENCY
         # ==========================================
 
         new_emergency = Emergency(
@@ -159,12 +173,16 @@ def create_emergency(
         db.add(new_emergency)
 
         # ==========================================
-        # 8. SINGLE DATABASE COMMIT
+        # 7. SINGLE DATABASE COMMIT
         # ==========================================
 
         db.commit()
 
         db.refresh(new_emergency)
+
+        # ==========================================
+        # 8. RETURN RESPONSE
+        # ==========================================
 
         return {
             "message": "Emergency created successfully",
@@ -195,7 +213,7 @@ def create_emergency(
         raise HTTPException(
             status_code=500,
             detail=f"Emergency creation failed: {str(error)}"
-        )   
+        )
 
 
 # ==========================================
@@ -207,106 +225,6 @@ def get_emergency(
     emergency_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
-
-    emergency = db.query(Emergency).filter(
-        Emergency.id == emergency_id
-    ).first()
-
-    if not emergency:
-        raise HTTPException(
-            status_code=404,
-            detail="Emergency not found"
-        )
-
-    if (
-        current_user.role != "Admin"
-        and emergency.user_id != current_user.id
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied"
-        )
-
-    return emergency_response(emergency)
-
-
-# ==========================================
-# UPDATE EMERGENCY
-# ==========================================
-
-@router.put("/emergencies/{emergency_id}")
-def update_emergency(
-    emergency_id: int,
-    emergency: EmergencyUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
-):
-
-    db_emergency = db.query(Emergency).filter(
-        Emergency.id == emergency_id
-    ).first()
-
-    if not db_emergency:
-        raise HTTPException(
-            status_code=404,
-            detail="Emergency not found"
-        )
-
-    # Update status
-    if emergency.status is not None:
-        db_emergency.status = emergency.status
-
-    # Update ambulance only if provided
-    if emergency.ambulance_id is not None:
-        db_emergency.ambulance_id = emergency.ambulance_id
-
-    # Update hospital only if provided
-    if emergency.hospital_id is not None:
-        db_emergency.hospital_id = emergency.hospital_id
-
-    db.commit()
-    db.refresh(db_emergency)
-
-    return {
-        "message": "Emergency updated successfully",
-        "data": emergency_response(db_emergency)
-    }
-
-
-# ==========================================
-# DELETE EMERGENCY
-# ==========================================
-
-@router.delete("/emergencies/{emergency_id}")
-def delete_emergency(
-    emergency_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
-):
-
-    db_emergency = db.query(Emergency).filter(
-        Emergency.id == emergency_id
-    ).first()
-
-    if not db_emergency:
-        raise HTTPException(
-            status_code=404,
-            detail="Emergency not found"
-        )
-
-    db.delete(db_emergency)
-    db.commit()
-
-    return {
-        "message": "Emergency deleted successfully"
-    }
-
-@router.put("/emergencies/{emergency_id}/complete")
-def complete_emergency(
-    emergency_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
 ):
 
     emergency = (
@@ -321,39 +239,191 @@ def complete_emergency(
             detail="Emergency not found"
         )
 
+    # Admin can view every emergency.
+    # Other users can only view their own emergency.
+    if (
+        current_user.role != "Admin"
+        and emergency.user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    return emergency_response(emergency)
+
+
+# ==========================================
+# UPDATE EMERGENCY
+# Admin Only
+# ==========================================
+
+@router.put("/emergencies/{emergency_id}")
+def update_emergency(
+    emergency_id: int,
+    emergency: EmergencyUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin"))
+):
+
+    db_emergency = (
+        db.query(Emergency)
+        .filter(Emergency.id == emergency_id)
+        .first()
+    )
+
+    if not db_emergency:
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency not found"
+        )
+
+    # ==========================================
+    # UPDATE STATUS
+    # ==========================================
+
+    if emergency.status is not None:
+        db_emergency.status = emergency.status
+
+    # ==========================================
+    # UPDATE AMBULANCE
+    # ==========================================
+
+    if emergency.ambulance_id is not None:
+        db_emergency.ambulance_id = emergency.ambulance_id
+
+    # ==========================================
+    # UPDATE HOSPITAL
+    # ==========================================
+
+    if emergency.hospital_id is not None:
+        db_emergency.hospital_id = emergency.hospital_id
+
+    db.commit()
+    db.refresh(db_emergency)
+
+    return {
+        "message": "Emergency updated successfully",
+        "data": emergency_response(db_emergency)
+    }
+
+
+# ==========================================
+# DELETE EMERGENCY
+# Admin Only
+# ==========================================
+
+@router.delete("/emergencies/{emergency_id}")
+def delete_emergency(
+    emergency_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin"))
+):
+
+    db_emergency = (
+        db.query(Emergency)
+        .filter(Emergency.id == emergency_id)
+        .first()
+    )
+
+    if not db_emergency:
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency not found"
+        )
+
+    db.delete(db_emergency)
+    db.commit()
+
+    return {
+        "message": "Emergency deleted successfully"
+    }
+
+
+# ==========================================
+# COMPLETE EMERGENCY
+# Admin Only
+# ==========================================
+
+@router.put("/emergencies/{emergency_id}/complete")
+def complete_emergency(
+    emergency_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin"))
+):
+
+    # ==========================================
+    # FIND EMERGENCY
+    # ==========================================
+
+    emergency = (
+        db.query(Emergency)
+        .filter(Emergency.id == emergency_id)
+        .first()
+    )
+
+    if not emergency:
+        raise HTTPException(
+            status_code=404,
+            detail="Emergency not found"
+        )
+
+    # ==========================================
+    # CHECK IF ALREADY COMPLETED
+    # ==========================================
+
     if emergency.status == "Completed":
         raise HTTPException(
             status_code=400,
             detail="Emergency already completed"
         )
 
+    # ==========================================
+    # MARK EMERGENCY AS COMPLETED
+    # ==========================================
+
     emergency.status = "Completed"
 
-    # Release Ambulance
-    if emergency.ambulance_id:
+    # ==========================================
+    # RELEASE AMBULANCE
+    # ==========================================
+
+    if emergency.ambulance_id is not None:
 
         ambulance = (
             db.query(Ambulance)
-            .filter(Ambulance.id == emergency.ambulance_id)
+            .filter(
+                Ambulance.id == emergency.ambulance_id
+            )
             .first()
         )
 
         if ambulance:
             ambulance.status = "Available"
 
-    # Release Hospital Bed
-    if emergency.hospital_id:
+    # ==========================================
+    # RELEASE HOSPITAL BED
+    # ==========================================
+
+    if emergency.hospital_id is not None:
 
         hospital = (
             db.query(Hospital)
-            .filter(Hospital.id == emergency.hospital_id)
+            .filter(
+                Hospital.id == emergency.hospital_id
+            )
             .first()
         )
 
         if hospital:
             hospital.available_beds += 1
 
+    # ==========================================
+    # COMMIT
+    # ==========================================
+
     db.commit()
+
     db.refresh(emergency)
 
     return {
