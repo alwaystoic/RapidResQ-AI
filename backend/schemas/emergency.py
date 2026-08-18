@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EmergencyCreate(BaseModel):
@@ -16,8 +16,16 @@ class EmergencyCreate(BaseModel):
 
 class EmergencyUpdate(BaseModel):
     status: Optional[str] = None
-    ambulance_id: Optional[int] = None
-    hospital_id: Optional[int] = None
+
+    ambulance_id: Optional[int] = Field(
+        default=None,
+        gt=0
+    )
+
+    hospital_id: Optional[int] = Field(
+        default=None,
+        gt=0
+    )
 
 
 class EmergencyResponse(BaseModel):
