@@ -18,7 +18,10 @@ def hospital_response(hospital):
         "name": hospital.name,
         "location": hospital.location,
         "contact": hospital.contact,
-        "available_beds": hospital.available_beds
+        "available_beds": hospital.available_beds,
+        "latitude": hospital.latitude,
+        "longitude": hospital.longitude,
+        "status": hospital.status
     }
 
 
