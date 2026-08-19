@@ -48,7 +48,7 @@ function Dashboard() {
         }
 
         const response = await fetch(
-          "http://127.0.0.1:8000/dashboard/admin",
+          "http://localhost:8000/dashboard/admin",
           {
             method: "GET",
             headers: {

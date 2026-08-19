@@ -8,6 +8,7 @@ function Emergencies() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completingId, setCompletingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   // ==========================================
   // NAVIGATION
@@ -158,6 +159,68 @@ function Emergencies() {
       );
     } finally {
       setCompletingId(null);
+    }
+  };
+
+  // ==========================================
+  // DELETE EMERGENCY
+  // ==========================================
+
+  const deleteEmergency = async (emergencyId) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete Emergency #${String(
+        emergencyId
+      ).padStart(3, "0")}?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingId(emergencyId);
+      setError("");
+
+      const token = localStorage.getItem("access_token");
+
+      if (!token) {
+        setError("You are not logged in.");
+        return;
+      }
+
+      const response = await fetch(
+        `${API_URL}/emergencies/${emergencyId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Failed to delete emergency."
+        );
+      }
+
+      // Remove immediately from the table
+      setEmergencies((currentEmergencies) =>
+        currentEmergencies.filter(
+          (emergency) => emergency.id !== emergencyId
+        )
+      );
+
+    } catch (err) {
+      console.error("Delete emergency error:", err);
+
+      setError(
+        err.message || "Unable to delete emergency."
+      );
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -375,7 +438,6 @@ function Emergencies() {
         <div className="card-header">
 
           <div>
-
             <h2>
               All Emergencies
             </h2>
@@ -383,7 +445,6 @@ function Emergencies() {
             <p>
               All reported emergency cases
             </p>
-
           </div>
 
           <span className="case-count">
@@ -542,34 +603,84 @@ function Emergencies() {
                       </span>
                     </td>
 
-                    {/* Action */}
+                    {/* ACTIONS */}
                     <td>
 
-                      {emergency.status !== "Completed" ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "7px",
+                        }}
+                      >
 
+                        {/* COMPLETE */}
+                        {emergency.status !== "Completed" ? (
+
+                          <button
+                            className="complete-button"
+                            onClick={() =>
+                              completeEmergency(
+                                emergency.id
+                              )
+                            }
+                            disabled={
+                              completingId === emergency.id ||
+                              deletingId === emergency.id
+                            }
+                          >
+                            {completingId === emergency.id
+                              ? "Completing..."
+                              : "Complete"}
+                          </button>
+
+                        ) : (
+
+                          <span className="completed-label">
+                            ✓ Completed
+                          </span>
+
+                        )}
+
+                        {/* DELETE */}
                         <button
-                          className="complete-button"
+                          type="button"
                           onClick={() =>
-                            completeEmergency(
+                            deleteEmergency(
                               emergency.id
                             )
                           }
                           disabled={
+                            deletingId === emergency.id ||
                             completingId === emergency.id
                           }
+                          style={{
+                            minWidth: "65px",
+                            height: "30px",
+                            padding: "0 10px",
+                            border: "1px solid #dc2626",
+                            borderRadius: "7px",
+                            background: "#ffffff",
+                            color: "#dc2626",
+                            fontSize: "10px",
+                            fontWeight: "700",
+                            cursor:
+                              deletingId === emergency.id
+                                ? "not-allowed"
+                                : "pointer",
+                            opacity:
+                              deletingId === emergency.id
+                                ? 0.6
+                                : 1,
+                            transition: "0.2s ease",
+                          }}
                         >
-                          {completingId === emergency.id
-                            ? "Completing..."
-                            : "Complete"}
+                          {deletingId === emergency.id
+                            ? "Deleting..."
+                            : "Delete"}
                         </button>
 
-                      ) : (
-
-                        <span className="completed-label">
-                          ✓ Completed
-                        </span>
-
-                      )}
+                      </div>
 
                     </td>
 

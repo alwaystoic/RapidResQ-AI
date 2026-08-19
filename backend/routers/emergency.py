@@ -56,6 +56,7 @@ def get_emergencies(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("Admin"))
 ):
+
     emergencies = db.query(Emergency).all()
 
     return {
@@ -241,6 +242,7 @@ def get_emergency(
 
     # Admin can view every emergency.
     # Other users can only view their own emergency.
+
     if (
         current_user.role != "Admin"
         and emergency.user_id != current_user.id
@@ -320,6 +322,10 @@ def delete_emergency(
     current_user: User = Depends(require_role("Admin"))
 ):
 
+    # ==========================================
+    # FIND EMERGENCY
+    # ==========================================
+
     db_emergency = (
         db.query(Emergency)
         .filter(Emergency.id == emergency_id)
@@ -332,7 +338,50 @@ def delete_emergency(
             detail="Emergency not found"
         )
 
+    # ==========================================
+    # RELEASE AMBULANCE
+    # ==========================================
+
+    if db_emergency.ambulance_id is not None:
+
+        ambulance = (
+            db.query(Ambulance)
+            .filter(
+                Ambulance.id == db_emergency.ambulance_id
+            )
+            .first()
+        )
+
+        if ambulance:
+            ambulance.status = "Available"
+
+    # ==========================================
+    # RELEASE HOSPITAL BED
+    # ==========================================
+
+    if db_emergency.hospital_id is not None:
+
+        hospital = (
+            db.query(Hospital)
+            .filter(
+                Hospital.id == db_emergency.hospital_id
+            )
+            .first()
+        )
+
+        if hospital:
+            hospital.available_beds += 1
+
+    # ==========================================
+    # DELETE EMERGENCY
+    # ==========================================
+
     db.delete(db_emergency)
+
+    # ==========================================
+    # COMMIT
+    # ==========================================
+
     db.commit()
 
     return {
