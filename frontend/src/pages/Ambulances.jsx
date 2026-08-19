@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import "./Ambulances.css";
 
+const API_URL = "http://127.0.0.1:8000";
+
 function Ambulances({ onNavigate }) {
   const [ambulances, setAmbulances] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,26 +23,25 @@ function Ambulances({ onNavigate }) {
     localStorage.getItem("access_token") ||
     localStorage.getItem("token");
 
-  // =========================
+  // ==========================================
   // FETCH AMBULANCES
-  // =========================
+  // ==========================================
 
   const fetchAmbulances = useCallback(async () => {
-  try {
-    if (!token) {
-      throw new Error("Session expired. Please login again.");
-    }
+    try {
+      if (!token) {
+        throw new Error("Session expired. Please login again.");
+      }
 
-    const response = await fetch(
-      "http://127.0.0.1:8000/ambulances",
-      {
+      const response = await fetch(`${API_URL}/ambulances`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-      }
-    );
+      });
+
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -53,30 +54,53 @@ function Ambulances({ onNavigate }) {
           );
         }
 
-        throw new Error("Failed to load ambulances.");
+        throw new Error(
+          data?.detail || "Failed to load ambulances."
+        );
       }
 
-      const data = await response.json();
+      // Backend can return:
+      // [ ... ]
+      //
+      // OR:
+      // { ambulances: [ ... ] }
 
-      setAmbulances(data.ambulances || []);
+      const ambulanceList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.ambulances)
+          ? data.ambulances
+          : [];
+
+      setAmbulances(ambulanceList);
+      setError("");
     } catch (err) {
-      console.error("Ambulance error:", err);
-      setError(err.message);
-      } finally {
-    setLoading(false);
-  }
-}, [token]);
+      console.error("Ambulance fetch error:", err);
+
+      setError(
+        err?.message || "Unable to load ambulances."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  // ==========================================
+  // INITIAL LOAD
+  // ==========================================
 
   useEffect(() => {
-  const loadAmbulances = async () => {
-    await fetchAmbulances();
-  };
+    // Delay the async state updates until after
+    // the effect itself has completed.
+    const timer = setTimeout(() => {
+      fetchAmbulances();
+    }, 0);
 
-  loadAmbulances();
-}, [fetchAmbulances]);
-  // =========================
+    return () => clearTimeout(timer);
+  }, [fetchAmbulances]);
+
+  // ==========================================
   // STATISTICS
-  // =========================
+  // ==========================================
 
   const total = ambulances.length;
 
@@ -95,9 +119,9 @@ function Ambulances({ onNavigate }) {
       ambulance.status?.toLowerCase() === "maintenance"
   ).length;
 
-  // =========================
-  // FORM
-  // =========================
+  // ==========================================
+  // FORM INPUT
+  // ==========================================
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
@@ -107,6 +131,10 @@ function Ambulances({ onNavigate }) {
       [name]: value,
     }));
   };
+
+  // ==========================================
+  // OPEN ADD FORM
+  // ==========================================
 
   const openAddForm = () => {
     setEditingAmbulance(null);
@@ -122,49 +150,96 @@ function Ambulances({ onNavigate }) {
     setShowForm(true);
   };
 
+  // ==========================================
+  // OPEN EDIT FORM
+  // ==========================================
+
   const openEditForm = (ambulance) => {
     setEditingAmbulance(ambulance);
 
     setFormData({
       vehicle: ambulance.vehicle || "",
       location: ambulance.location || "",
-      latitude: ambulance.latitude ?? "",
-      longitude: ambulance.longitude ?? "",
+      latitude:
+        ambulance.latitude !== null &&
+        ambulance.latitude !== undefined
+          ? ambulance.latitude
+          : "",
+      longitude:
+        ambulance.longitude !== null &&
+        ambulance.longitude !== undefined
+          ? ambulance.longitude
+          : "",
       status: ambulance.status || "Available",
     });
 
     setShowForm(true);
   };
 
+  // ==========================================
+  // CLOSE FORM
+  // ==========================================
+
   const closeForm = () => {
     setShowForm(false);
     setEditingAmbulance(null);
+
+    setFormData({
+      vehicle: "",
+      location: "",
+      latitude: "",
+      longitude: "",
+      status: "Available",
+    });
   };
 
-  // =========================
-  // CREATE / UPDATE
-  // =========================
+  // ==========================================
+  // CREATE / UPDATE AMBULANCE
+  // ==========================================
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     try {
-      const url = editingAmbulance
-        ? `http://127.0.0.1:8000/ambulances/${editingAmbulance.id}`
-        : "http://127.0.0.1:8000/ambulances";
+      if (!token) {
+        throw new Error("Session expired. Please login again.");
+      }
 
-      const method = editingAmbulance ? "PUT" : "POST";
+      const latitude = Number(formData.latitude);
+      const longitude = Number(formData.longitude);
+
+      if (!Number.isFinite(latitude)) {
+        throw new Error("Latitude must be a valid number.");
+      }
+
+      if (!Number.isFinite(longitude)) {
+        throw new Error("Longitude must be a valid number.");
+      }
+
+      if (!formData.vehicle.trim()) {
+        throw new Error("Vehicle ID is required.");
+      }
+
+      if (!formData.location.trim()) {
+        throw new Error("Location is required.");
+      }
 
       const payload = {
-        vehicle: formData.vehicle,
-        location: formData.location,
-        latitude: Number(formData.latitude),
-        longitude: Number(formData.longitude),
+        vehicle: formData.vehicle.trim(),
+        location: formData.location.trim(),
+        latitude,
+        longitude,
         status: formData.status,
       };
 
+      const isEditing = Boolean(editingAmbulance);
+
+      const url = isEditing
+        ? `${API_URL}/ambulances/${editingAmbulance.id}`
+        : `${API_URL}/ambulances`;
+
       const response = await fetch(url, {
-        method,
+        method: isEditing ? "PUT" : "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -172,28 +247,33 @@ function Ambulances({ onNavigate }) {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
+      const data = await response.json().catch(() => null);
 
+      if (!response.ok) {
         throw new Error(
           data?.detail ||
             `Failed to ${
-              editingAmbulance ? "update" : "create"
+              isEditing ? "update" : "create"
             } ambulance.`
         );
       }
 
       closeForm();
+
       await fetchAmbulances();
     } catch (err) {
       console.error("Save ambulance error:", err);
-      alert(err.message);
+
+      alert(
+        err?.message ||
+          "Unable to save ambulance."
+      );
     }
   };
 
-  // =========================
-  // DELETE
-  // =========================
+  // ==========================================
+  // DELETE AMBULANCE
+  // ==========================================
 
   const handleDelete = async (ambulance) => {
     const confirmed = window.confirm(
@@ -205,8 +285,12 @@ function Ambulances({ onNavigate }) {
     }
 
     try {
+      if (!token) {
+        throw new Error("Session expired. Please login again.");
+      }
+
       const response = await fetch(
-        `http://127.0.0.1:8000/ambulances/${ambulance.id}`,
+        `${API_URL}/ambulances/${ambulance.id}`,
         {
           method: "DELETE",
           headers: {
@@ -216,24 +300,33 @@ function Ambulances({ onNavigate }) {
         }
       );
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
+      const data = await response.json().catch(() => null);
 
+      if (!response.ok) {
         throw new Error(
-          data?.detail || "Failed to delete ambulance."
+          data?.detail ||
+            "Failed to delete ambulance."
         );
       }
 
-      await fetchAmbulances();
+      setAmbulances((current) =>
+        current.filter(
+          (item) => item.id !== ambulance.id
+        )
+      );
     } catch (err) {
       console.error("Delete ambulance error:", err);
-      alert(err.message);
+
+      alert(
+        err?.message ||
+          "Unable to delete ambulance."
+      );
     }
   };
 
-  // =========================
+  // ==========================================
   // STATUS CLASS
-  // =========================
+  // ==========================================
 
   const getStatusClass = (status) => {
     const normalized = status?.toLowerCase();
@@ -253,25 +346,31 @@ function Ambulances({ onNavigate }) {
     return "unknown";
   };
 
-  // =========================
-  // LOADING
-  // =========================
+  // ==========================================
+  // LOADING SCREEN
+  // ==========================================
 
   if (loading) {
     return (
       <div className="ambulances-page">
         <div className="ambulances-loading">
-          <div className="loading-icon">🚑</div>
+          <div className="loading-icon">
+            🚑
+          </div>
+
           <h2>Loading Ambulances...</h2>
-          <p>Fetching the current ambulance fleet.</p>
+
+          <p>
+            Fetching the current ambulance fleet.
+          </p>
         </div>
       </div>
     );
   }
 
-  // =========================
-  // PAGE
-  // =========================
+  // ==========================================
+  // MAIN PAGE
+  // ==========================================
 
   return (
     <div className="ambulances-page">
@@ -301,7 +400,8 @@ function Ambulances({ onNavigate }) {
             <h1>Ambulances</h1>
 
             <p>
-              Manage and monitor the RapidResQ ambulance fleet
+              Manage and monitor the RapidResQ
+              ambulance fleet
             </p>
           </div>
 
@@ -333,15 +433,21 @@ function Ambulances({ onNavigate }) {
 
       {error && (
         <div className="ambulance-error">
+
           <span>⚠️</span>
+
           <div>
-            <strong>Unable to load ambulances</strong>
+            <strong>
+              Unable to load ambulances
+            </strong>
+
             <p>{error}</p>
           </div>
 
           <button onClick={fetchAmbulances}>
             Try Again
           </button>
+
         </div>
       )}
 
@@ -352,6 +458,7 @@ function Ambulances({ onNavigate }) {
       <section className="ambulance-stats">
 
         <div className="ambulance-stat-card total-card">
+
           <div className="ambulance-stat-icon">
             🚑
           </div>
@@ -359,11 +466,15 @@ function Ambulances({ onNavigate }) {
           <div>
             <span>Total Fleet</span>
             <strong>{total}</strong>
-            <small>Registered ambulances</small>
+            <small>
+              Registered ambulances
+            </small>
           </div>
+
         </div>
 
         <div className="ambulance-stat-card available-card">
+
           <div className="ambulance-stat-icon">
             ✓
           </div>
@@ -371,11 +482,15 @@ function Ambulances({ onNavigate }) {
           <div>
             <span>Available</span>
             <strong>{available}</strong>
-            <small>Ready for dispatch</small>
+            <small>
+              Ready for dispatch
+            </small>
           </div>
+
         </div>
 
         <div className="ambulance-stat-card busy-card">
+
           <div className="ambulance-stat-icon">
             🚨
           </div>
@@ -383,11 +498,15 @@ function Ambulances({ onNavigate }) {
           <div>
             <span>Busy</span>
             <strong>{busy}</strong>
-            <small>Currently assigned</small>
+            <small>
+              Currently assigned
+            </small>
           </div>
+
         </div>
 
         <div className="ambulance-stat-card maintenance-card">
+
           <div className="ambulance-stat-icon">
             🔧
           </div>
@@ -395,8 +514,11 @@ function Ambulances({ onNavigate }) {
           <div>
             <span>Maintenance</span>
             <strong>{maintenance}</strong>
-            <small>Unavailable for service</small>
+            <small>
+              Unavailable for service
+            </small>
           </div>
+
         </div>
 
       </section>
@@ -418,7 +540,10 @@ function Ambulances({ onNavigate }) {
           </div>
 
           <span className="fleet-count">
-            {total} {total === 1 ? "ambulance" : "ambulances"}
+            {total}{" "}
+            {total === 1
+              ? "ambulance"
+              : "ambulances"}
           </span>
 
         </div>
@@ -426,18 +551,20 @@ function Ambulances({ onNavigate }) {
         {ambulances.length === 0 ? (
 
           <div className="empty-fleet">
+
             <div>🚑</div>
 
             <h3>No ambulances found</h3>
 
             <p>
-              There are currently no ambulances registered
-              in the system.
+              There are currently no ambulances
+              registered in the system.
             </p>
 
             <button onClick={openAddForm}>
               + Add First Ambulance
             </button>
+
           </div>
 
         ) : (
@@ -447,6 +574,7 @@ function Ambulances({ onNavigate }) {
             <table className="fleet-table">
 
               <thead>
+
                 <tr>
                   <th>ID</th>
                   <th>Vehicle</th>
@@ -455,6 +583,7 @@ function Ambulances({ onNavigate }) {
                   <th>GPS Coordinates</th>
                   <th>Actions</th>
                 </tr>
+
               </thead>
 
               <tbody>
@@ -465,11 +594,15 @@ function Ambulances({ onNavigate }) {
 
                     <td>
                       <span className="ambulance-id">
-                        #{String(ambulance.id).padStart(3, "0")}
+                        #
+                        {String(
+                          ambulance.id
+                        ).padStart(3, "0")}
                       </span>
                     </td>
 
                     <td>
+
                       <div className="vehicle-cell">
 
                         <div className="vehicle-icon">
@@ -477,6 +610,7 @@ function Ambulances({ onNavigate }) {
                         </div>
 
                         <div>
+
                           <strong>
                             {ambulance.vehicle}
                           </strong>
@@ -484,33 +618,49 @@ function Ambulances({ onNavigate }) {
                           <small>
                             Ambulance Unit
                           </small>
+
                         </div>
 
                       </div>
+
                     </td>
 
                     <td>
+
                       <div className="location-cell">
+
                         <span>📍</span>
+
                         <span>
-                          {ambulance.location || "Unknown"}
+                          {ambulance.location ||
+                            "Unknown"}
                         </span>
+
                       </div>
+
                     </td>
 
                     <td>
+
                       <span
                         className={`status-badge ${getStatusClass(
                           ambulance.status
                         )}`}
                       >
+
                         <span className="status-dot"></span>
-                        {ambulance.status || "Unknown"}
+
+                        {ambulance.status ||
+                          "Unknown"}
+
                       </span>
+
                     </td>
 
                     <td>
+
                       <div className="coordinates">
+
                         <span>
                           {ambulance.latitude}
                         </span>
@@ -518,16 +668,21 @@ function Ambulances({ onNavigate }) {
                         <span>
                           {ambulance.longitude}
                         </span>
+
                       </div>
+
                     </td>
 
                     <td>
+
                       <div className="action-buttons">
 
                         <button
                           className="edit-button"
                           onClick={() =>
-                            openEditForm(ambulance)
+                            openEditForm(
+                              ambulance
+                            )
                           }
                         >
                           Edit
@@ -536,13 +691,16 @@ function Ambulances({ onNavigate }) {
                         <button
                           className="delete-button"
                           onClick={() =>
-                            handleDelete(ambulance)
+                            handleDelete(
+                              ambulance
+                            )
                           }
                         >
                           Delete
                         </button>
 
                       </div>
+
                     </td>
 
                   </tr>
@@ -580,6 +738,7 @@ function Ambulances({ onNavigate }) {
             <div className="modal-header">
 
               <div>
+
                 <h2>
                   {editingAmbulance
                     ? "Edit Ambulance"
@@ -591,11 +750,13 @@ function Ambulances({ onNavigate }) {
                     ? "Update ambulance information"
                     : "Register a new ambulance"}
                 </p>
+
               </div>
 
               <button
                 className="modal-close"
                 onClick={closeForm}
+                type="button"
               >
                 ×
               </button>
@@ -692,6 +853,7 @@ function Ambulances({ onNavigate }) {
                   value={formData.status}
                   onChange={handleInputChange}
                 >
+
                   <option value="Available">
                     Available
                   </option>
@@ -703,6 +865,7 @@ function Ambulances({ onNavigate }) {
                   <option value="Maintenance">
                     Maintenance
                   </option>
+
                 </select>
 
               </div>
