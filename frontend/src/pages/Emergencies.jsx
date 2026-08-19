@@ -53,7 +53,28 @@ function Emergencies() {
         }
 
         if (!cancelled) {
-          setEmergencies(data.emergencies || []);
+          /*
+           * Backend may return either:
+           *
+           * [
+           *   {...},
+           *   {...}
+           * ]
+           *
+           * OR:
+           *
+           * {
+           *   emergencies: [...]
+           * }
+           *
+           * Support both formats.
+           */
+          setEmergencies(
+            Array.isArray(data)
+              ? data
+              : data.emergencies || []
+          );
+
           setError("");
           setLoading(false);
         }
@@ -106,7 +127,11 @@ function Emergencies() {
         );
       }
 
-      setEmergencies(data.emergencies || []);
+      setEmergencies(
+        Array.isArray(data)
+          ? data
+          : data.emergencies || []
+      );
     } catch (err) {
       console.error("Emergency refresh error:", err);
 
@@ -212,7 +237,6 @@ function Emergencies() {
           (emergency) => emergency.id !== emergencyId
         )
       );
-
     } catch (err) {
       console.error("Delete emergency error:", err);
 
@@ -337,7 +361,8 @@ function Emergencies() {
               fontSize: "14px",
               fontWeight: "600",
               cursor: "pointer",
-              boxShadow: "0 2px 6px rgba(0, 0, 0, 0.06)",
+              boxShadow:
+                "0 2px 6px rgba(0, 0, 0, 0.06)",
             }}
           >
             ← Back to Dashboard
