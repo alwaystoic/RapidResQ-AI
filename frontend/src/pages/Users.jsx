@@ -8,19 +8,25 @@ function Users() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Edit state
+  // ==========================================
+  // EDIT USER
+  // ==========================================
+
   const [editingUser, setEditingUser] = useState(null);
   const [editForm, setEditForm] = useState({
     full_name: "",
     email: "",
     phone: "",
     password: "",
-    role: "",
+    role: "Citizen",
     status: "Active",
   });
   const [savingUser, setSavingUser] = useState(false);
 
-  // Add user state
+  // ==========================================
+  // ADD USER
+  // ==========================================
+
   const [addingUser, setAddingUser] = useState(false);
   const [addForm, setAddForm] = useState({
     full_name: "",
@@ -32,7 +38,10 @@ function Users() {
   });
   const [creatingUser, setCreatingUser] = useState(false);
 
-  // Delete state
+  // ==========================================
+  // DELETE
+  // ==========================================
+
   const [deletingId, setDeletingId] = useState(null);
 
   // ==========================================
@@ -44,15 +53,43 @@ function Users() {
   };
 
   // ==========================================
-  // LOAD USERS
+  // TOKEN
   // ==========================================
 
-  const fetchUsers = async () => {
+  const getToken = () => {
     const token = localStorage.getItem("access_token");
 
     if (!token) {
       throw new Error("You are not logged in.");
     }
+
+    return token;
+  };
+
+  // ==========================================
+  // API RESPONSE ERROR
+  // ==========================================
+
+  const getErrorMessage = (data, fallback) => {
+    if (Array.isArray(data?.detail)) {
+      return data.detail
+        .map((item) => item.msg || "Validation error")
+        .join(", ");
+    }
+
+    if (typeof data?.detail === "string") {
+      return data.detail;
+    }
+
+    return fallback;
+  };
+
+  // ==========================================
+  // LOAD USERS
+  // ==========================================
+
+  const fetchUsers = async () => {
+    const token = getToken();
 
     const response = await fetch(`${API_URL}/users`, {
       method: "GET",
@@ -64,7 +101,9 @@ function Users() {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.detail || "Failed to load users.");
+      throw new Error(
+        getErrorMessage(data, "Failed to load users.")
+      );
     }
 
     return data.users || [];
@@ -108,7 +147,7 @@ function Users() {
   }, []);
 
   // ==========================================
-  // REFRESH USERS
+  // REFRESH
   // ==========================================
 
   const refreshUsers = async () => {
@@ -159,7 +198,7 @@ function Users() {
       email: "",
       phone: "",
       password: "",
-      role: "",
+      role: "Citizen",
       status: "Active",
     });
   };
@@ -184,11 +223,7 @@ function Users() {
       setSavingUser(true);
       setError("");
 
-      const token = localStorage.getItem("access_token");
-
-      if (!token) {
-        throw new Error("You are not logged in.");
-      }
+      const token = getToken();
 
       if (!editForm.full_name.trim()) {
         throw new Error("Full name is required.");
@@ -210,16 +245,17 @@ function Users() {
         throw new Error("Status is required.");
       }
 
-      /*
-       * The current backend PUT /users/{id}
-       * accepts UserCreate, so password is required.
-       *
-       * We therefore require a new password while editing.
-       */
-      if (!editForm.password.trim()) {
-        throw new Error(
-          "Please enter a new password when updating the user."
-        );
+      const payload = {
+        full_name: editForm.full_name.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim(),
+        role: editForm.role,
+        status: editForm.status,
+      };
+
+      // Password is optional during update.
+      if (editForm.password.trim()) {
+        payload.password = editForm.password;
       }
 
       const response = await fetch(
@@ -230,34 +266,18 @@ function Users() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            full_name: editForm.full_name.trim(),
-            email: editForm.email.trim(),
-            phone: editForm.phone.trim(),
-            password: editForm.password,
-            role: editForm.role,
-            status: editForm.status,
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
       const data = await response.json();
 
       if (!response.ok) {
-        let message = "Failed to update user.";
-
-        if (Array.isArray(data.detail)) {
-          message = data.detail
-            .map((item) => item.msg || "Validation error")
-            .join(", ");
-        } else if (typeof data.detail === "string") {
-          message = data.detail;
-        }
-
-        throw new Error(message);
+        throw new Error(
+          getErrorMessage(data, "Failed to update user.")
+        );
       }
 
-      // Update the user immediately in the table
       if (data.data) {
         setUsers((previousUsers) =>
           previousUsers.map((user) =>
@@ -267,7 +287,6 @@ function Users() {
           )
         );
       } else {
-        // Fallback: reload from backend
         const updatedUsers = await fetchUsers();
         setUsers(updatedUsers);
       }
@@ -292,6 +311,7 @@ function Users() {
 
   const openAddModal = () => {
     setError("");
+
     setAddForm({
       full_name: "",
       email: "",
@@ -300,13 +320,17 @@ function Users() {
       role: "Citizen",
       status: "Active",
     });
+
     setAddingUser(true);
   };
 
   const closeAddModal = () => {
-    if (creatingUser) return;
+    if (creatingUser) {
+      return;
+    }
 
     setAddingUser(false);
+
     setAddForm({
       full_name: "",
       email: "",
@@ -333,11 +357,7 @@ function Users() {
       setCreatingUser(true);
       setError("");
 
-      const token = localStorage.getItem("access_token");
-
-      if (!token) {
-        throw new Error("You are not logged in.");
-      }
+      const token = getToken();
 
       if (!addForm.full_name.trim()) {
         throw new Error("Full name is required.");
@@ -374,31 +394,30 @@ function Users() {
       const data = await response.json();
 
       if (!response.ok) {
-        let message = "Failed to create user.";
-
-        if (Array.isArray(data.detail)) {
-          message = data.detail
-            .map((item) => item.msg || "Validation error")
-            .join(", ");
-        } else if (typeof data.detail === "string") {
-          message = data.detail;
-        }
-
-        throw new Error(message);
+        throw new Error(
+          getErrorMessage(data, "Failed to create user.")
+        );
       }
 
       if (data.data) {
-        setUsers((previousUsers) => [...previousUsers, data.data]);
+        setUsers((previousUsers) => [
+          ...previousUsers,
+          data.data,
+        ]);
       } else {
         const updatedUsers = await fetchUsers();
         setUsers(updatedUsers);
       }
 
       closeAddModal();
+
       console.log("User created successfully:", data);
     } catch (err) {
       console.error("User create error:", err);
-      setError(err.message || "Unable to create user.");
+
+      setError(
+        err.message || "Unable to create user."
+      );
     } finally {
       setCreatingUser(false);
     }
@@ -421,11 +440,7 @@ function Users() {
       setDeletingId(user.id);
       setError("");
 
-      const token = localStorage.getItem("access_token");
-
-      if (!token) {
-        throw new Error("You are not logged in.");
-      }
+      const token = getToken();
 
       const response = await fetch(
         `${API_URL}/users/${user.id}`,
@@ -441,11 +456,10 @@ function Users() {
 
       if (!response.ok) {
         throw new Error(
-          data.detail || "Failed to delete user."
+          getErrorMessage(data, "Failed to delete user.")
         );
       }
 
-      // Remove deleted user immediately from table
       setUsers((previousUsers) =>
         previousUsers.filter(
           (existingUser) =>
@@ -532,7 +546,7 @@ function Users() {
   };
 
   // ==========================================
-  // LOADING STATE
+  // LOADING
   // ==========================================
 
   if (loading) {
@@ -573,7 +587,7 @@ function Users() {
             className="back-button"
             onClick={goToDashboard}
           >
-            ← Back to Dashboard
+            ← Dashboard
           </button>
 
           <h1>Users</h1>
@@ -612,7 +626,7 @@ function Users() {
 
       {error && (
         <div className="users-error">
-          <strong>Error:</strong> {error}
+          {error}
         </div>
       )}
 
@@ -623,7 +637,6 @@ function Users() {
       <section className="users-stats">
 
         <div className="user-stat-card total">
-
           <div className="stat-icon">
             👥
           </div>
@@ -633,11 +646,9 @@ function Users() {
             <strong>{totalUsers}</strong>
             <small>Registered users</small>
           </div>
-
         </div>
 
         <div className="user-stat-card active">
-
           <div className="stat-icon">
             ✓
           </div>
@@ -645,27 +656,23 @@ function Users() {
           <div>
             <span>Active</span>
             <strong>{activeUsers}</strong>
-            <small>Active accounts</small>
+            <small>Currently active</small>
           </div>
-
         </div>
 
         <div className="user-stat-card inactive">
-
           <div className="stat-icon">
-            !
+            ⏸
           </div>
 
           <div>
             <span>Inactive</span>
             <strong>{inactiveUsers}</strong>
-            <small>Inactive accounts</small>
+            <small>Not active</small>
           </div>
-
         </div>
 
         <div className="user-stat-card admins">
-
           <div className="stat-icon">
             🛡
           </div>
@@ -673,23 +680,20 @@ function Users() {
           <div>
             <span>Admins</span>
             <strong>{adminUsers}</strong>
-            <small>Administrator accounts</small>
+            <small>Administrators</small>
           </div>
-
         </div>
 
         <div className="user-stat-card staff">
-
           <div className="stat-icon">
             👤
           </div>
 
           <div>
-            <span>Other Users</span>
+            <span>Staff / Citizens</span>
             <strong>{staffUsers}</strong>
-            <small>Non-admin accounts</small>
+            <small>Non-admin users</small>
           </div>
-
         </div>
 
       </section>
@@ -703,20 +707,16 @@ function Users() {
         <div className="users-table-header">
 
           <div>
-
-            <h2>User Directory</h2>
+            <h2>User Network</h2>
 
             <p>
               All registered RapidResQ users
             </p>
-
           </div>
 
           <span className="user-count">
-            {users.length}{" "}
-            {users.length === 1
-              ? "user"
-              : "users"}
+            {totalUsers}{" "}
+            {totalUsers === 1 ? "user" : "users"}
           </span>
 
         </div>
@@ -778,11 +778,11 @@ function Users() {
                         <div>
 
                           <strong>
-                            {user.full_name || "N/A"}
+                            {user.full_name}
                           </strong>
 
                           <small>
-                            User account
+                            User ID: {user.id}
                           </small>
 
                         </div>
@@ -792,46 +792,37 @@ function Users() {
                     </td>
 
                     <td>
-                      {user.email || "N/A"}
+                      {user.email}
                     </td>
 
                     <td>
-                      {user.phone || "N/A"}
+                      {user.phone}
                     </td>
 
                     <td>
-
                       <span
                         className={getRoleClass(
                           user.role
                         )}
                       >
-                        {user.role || "Unknown"}
+                        {user.role}
                       </span>
-
                     </td>
 
                     <td>
-
                       <span
                         className={getStatusClass(
                           user.status
                         )}
                       >
-
-                        <span className="status-dot"></span>
-
-                        {user.status || "Unknown"}
-
+                        <span className="status-dot" />
+                        {user.status}
                       </span>
-
                     </td>
 
                     <td>
 
                       <div className="user-actions">
-
-                        {/* EDIT */}
 
                         <button
                           type="button"
@@ -839,23 +830,18 @@ function Users() {
                           onClick={() =>
                             openEditModal(user)
                           }
-                          disabled={
-                            deletingId === user.id
-                          }
                         >
                           Edit
                         </button>
 
-                        {/* DELETE */}
-
                         <button
                           type="button"
                           className="delete-user-button"
-                          onClick={() =>
-                            deleteUser(user)
-                          }
                           disabled={
                             deletingId === user.id
+                          }
+                          onClick={() =>
+                            deleteUser(user)
                           }
                         >
                           {deletingId === user.id
@@ -886,256 +872,133 @@ function Users() {
       ====================================== */}
 
       {addingUser && (
+
         <div
-          onClick={closeAddModal}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "20px",
+          style={modalOverlayStyle}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeAddModal();
+            }
           }}
         >
-          <div
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: "520px",
-              background: "#ffffff",
-              borderRadius: "14px",
-              padding: "28px",
-              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.18)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "22px",
-              }}
-            >
+
+          <div style={modalStyle}>
+
+            <div style={modalHeaderStyle}>
+
               <div>
-                <h2 style={{ margin: 0, fontSize: "22px", color: "#171717" }}>
+                <h2 style={modalTitleStyle}>
                   Add User
                 </h2>
-                <p style={{
-                  margin: "6px 0 0",
-                  color: "#6b7280",
-                  fontSize: "14px",
-                }}>
-                  Create a new RapidResQ user account
+
+                <p style={modalSubtitleStyle}>
+                  Create a new RapidResQ user
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={closeAddModal}
-                disabled={creatingUser}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: "24px",
-                  color: "#6b7280",
-                  cursor: creatingUser ? "not-allowed" : "pointer",
-                }}
+                style={closeButtonStyle}
               >
                 ×
               </button>
+
             </div>
 
             <form onSubmit={createUser}>
-              {[
-                ["full_name", "Full Name", "text", "Enter full name"],
-                ["email", "Email", "email", "Enter email address"],
-                ["phone", "Phone", "text", "Enter phone number"],
-              ].map(([name, label, type, placeholder]) => (
-                <div key={name} style={{ marginBottom: "16px" }}>
-                  <label
-                    htmlFor={`add-${name}`}
-                    style={{
-                      display: "block",
-                      marginBottom: "6px",
-                      fontSize: "14px",
-                      fontWeight: "600",
-                      color: "#374151",
-                    }}
-                  >
-                    {label}
-                  </label>
 
-                  <input
-                    id={`add-${name}`}
-                    type={type}
-                    name={name}
-                    value={addForm[name]}
-                    onChange={handleAddChange}
-                    required
-                    placeholder={placeholder}
-                    style={{
-                      width: "100%",
-                      padding: "11px 12px",
-                      border: "1px solid #d1d5db",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-              ))}
+              <div style={formGridStyle}>
 
-              <div style={{ marginBottom: "16px" }}>
-                <label
-                  htmlFor="add-role"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  Role
-                </label>
+                <FormField
+                  label="Full Name"
+                  name="full_name"
+                  value={addForm.full_name}
+                  onChange={handleAddChange}
+                  placeholder="Enter full name"
+                />
 
-                <select
-                  id="add-role"
+                <FormField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={addForm.email}
+                  onChange={handleAddChange}
+                  placeholder="Enter email"
+                />
+
+                <FormField
+                  label="Phone"
+                  name="phone"
+                  value={addForm.phone}
+                  onChange={handleAddChange}
+                  placeholder="Enter phone number"
+                />
+
+                <FormField
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={addForm.password}
+                  onChange={handleAddChange}
+                  placeholder="Enter password"
+                />
+
+                <SelectField
+                  label="Role"
                   name="role"
                   value={addForm.role}
                   onChange={handleAddChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    background: "#ffffff",
-                    outline: "none",
-                  }}
-                >
-                  <option value="Admin">Admin</option>
-                  <option value="Citizen">Citizen</option>
-                  <option value="Dispatcher">Dispatcher</option>
-                  <option value="Hospital">Hospital</option>
-                </select>
-              </div>
+                  options={[
+                    "Citizen",
+                    "Dispatcher",
+                    "Hospital",
+                    "Admin",
+                  ]}
+                />
 
-              <div style={{ marginBottom: "16px" }}>
-                <label
-                  htmlFor="add-status"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  Status
-                </label>
-
-                <select
-                  id="add-status"
+                <SelectField
+                  label="Status"
                   name="status"
                   value={addForm.status}
                   onChange={handleAddChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    background: "#ffffff",
-                    outline: "none",
-                  }}
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-
-              <div style={{ marginBottom: "22px" }}>
-                <label
-                  htmlFor="add-password"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  Password
-                </label>
-
-                <input
-                  id="add-password"
-                  type="password"
-                  name="password"
-                  value={addForm.password}
-                  onChange={handleAddChange}
-                  required
-                  placeholder="Enter password"
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
+                  options={[
+                    "Active",
+                    "Inactive",
+                  ]}
                 />
+
               </div>
 
-              <div style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "10px",
-              }}>
+              <div style={modalActionsStyle}>
+
                 <button
                   type="button"
                   onClick={closeAddModal}
+                  style={cancelButtonStyle}
                   disabled={creatingUser}
-                  style={{
-                    padding: "10px 18px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    background: "#ffffff",
-                    color: "#374151",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    cursor: creatingUser ? "not-allowed" : "pointer",
-                  }}
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
+                  style={saveButtonStyle}
                   disabled={creatingUser}
-                  style={{
-                    padding: "10px 18px",
-                    border: "none",
-                    borderRadius: "8px",
-                    background: "#ef1b2d",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    cursor: creatingUser ? "not-allowed" : "pointer",
-                    opacity: creatingUser ? 0.7 : 1,
-                  }}
                 >
-                  {creatingUser ? "Creating..." : "Create User"}
+                  {creatingUser
+                    ? "Creating..."
+                    : "Create User"}
                 </button>
+
               </div>
+
             </form>
+
           </div>
+
         </div>
+
       )}
 
       {/* ======================================
@@ -1143,392 +1006,134 @@ function Users() {
       ====================================== */}
 
       {editingUser && (
+
         <div
-          onClick={closeEditModal}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "20px",
+          style={modalOverlayStyle}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeEditModal();
+            }
           }}
         >
 
-          <div
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-            style={{
-              width: "100%",
-              maxWidth: "520px",
-              background: "#ffffff",
-              borderRadius: "14px",
-              padding: "28px",
-              boxShadow:
-                "0 20px 50px rgba(0, 0, 0, 0.18)",
-            }}
-          >
+          <div style={modalStyle}>
 
-            {/* MODAL HEADER */}
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "22px",
-              }}
-            >
+            <div style={modalHeaderStyle}>
 
               <div>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontSize: "22px",
-                    color: "#171717",
-                  }}
-                >
+                <h2 style={modalTitleStyle}>
                   Edit User
                 </h2>
 
-                <p
-                  style={{
-                    margin:
-                      "6px 0 0",
-                    color: "#6b7280",
-                    fontSize: "14px",
-                  }}
-                >
-                  Update user account details
+                <p style={modalSubtitleStyle}>
+                  Update user information
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={closeEditModal}
+                style={closeButtonStyle}
                 disabled={savingUser}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: "24px",
-                  color: "#6b7280",
-                  cursor: "pointer",
-                }}
               >
                 ×
               </button>
 
             </div>
 
-            {/* EDIT FORM */}
-
             <form onSubmit={updateUser}>
 
-              {/* FULL NAME */}
+              <div style={formGridStyle}>
 
-              <div style={{ marginBottom: "16px" }}>
-
-                <label
-                  htmlFor="edit-full-name"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  Full Name
-                </label>
-
-                <input
-                  id="edit-full-name"
-                  type="text"
+                <FormField
+                  label="Full Name"
                   name="full_name"
                   value={editForm.full_name}
                   onChange={handleEditChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border:
-                      "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
+                  placeholder="Enter full name"
                 />
 
-              </div>
-
-              {/* EMAIL */}
-
-              <div style={{ marginBottom: "16px" }}>
-
-                <label
-                  htmlFor="edit-email"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  Email
-                </label>
-
-                <input
-                  id="edit-email"
-                  type="email"
+                <FormField
+                  label="Email"
                   name="email"
+                  type="email"
                   value={editForm.email}
                   onChange={handleEditChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border:
-                      "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
+                  placeholder="Enter email"
                 />
 
-              </div>
-
-              {/* PHONE */}
-
-              <div style={{ marginBottom: "16px" }}>
-
-                <label
-                  htmlFor="edit-phone"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  Phone
-                </label>
-
-                <input
-                  id="edit-phone"
-                  type="text"
+                <FormField
+                  label="Phone"
                   name="phone"
                   value={editForm.phone}
                   onChange={handleEditChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border:
-                      "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
+                  placeholder="Enter phone number"
                 />
 
-              </div>
+                <FormField
+                  label="New Password"
+                  name="password"
+                  type="password"
+                  value={editForm.password}
+                  onChange={handleEditChange}
+                  placeholder="Leave blank to keep current password"
+                />
 
-              {/* ROLE */}
-
-              <div style={{ marginBottom: "16px" }}>
-
-                <label
-                  htmlFor="edit-role"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  Role
-                </label>
-
-                <select
-                  id="edit-role"
+                <SelectField
+                  label="Role"
                   name="role"
                   value={editForm.role}
                   onChange={handleEditChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border:
-                      "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    background: "#ffffff",
-                    outline: "none",
-                  }}
-                >
+                  options={[
+                    "Citizen",
+                    "Dispatcher",
+                    "Hospital",
+                    "Admin",
+                  ]}
+                />
 
-                  <option value="Admin">
-                    Admin
-                  </option>
-
-                  <option value="Citizen">
-                    Citizen
-                  </option>
-
-                  <option value="Dispatcher">
-                    Dispatcher
-                  </option>
-
-                  <option value="Hospital">
-                    Hospital
-                  </option>
-
-                </select>
-
-              </div>
-
-              {/* STATUS */}
-
-              <div style={{ marginBottom: "16px" }}>
-
-                <label
-                  htmlFor="edit-status"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  Status
-                </label>
-
-                <select
-                  id="edit-status"
+                <SelectField
+                  label="Status"
                   name="status"
                   value={editForm.status}
                   onChange={handleEditChange}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    background: "#ffffff",
-                    outline: "none",
-                  }}
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-
-              </div>
-
-              {/* PASSWORD */}
-
-              <div style={{ marginBottom: "22px" }}>
-
-                <label
-                  htmlFor="edit-password"
-                  style={{
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    color: "#374151",
-                  }}
-                >
-                  New Password
-                </label>
-
-                <input
-                  id="edit-password"
-                  type="password"
-                  name="password"
-                  value={editForm.password}
-                  onChange={handleEditChange}
-                  required
-                  placeholder="Enter new password"
-                  style={{
-                    width: "100%",
-                    padding: "11px 12px",
-                    border:
-                      "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    outline: "none",
-                  }}
+                  options={[
+                    "Active",
+                    "Inactive",
+                  ]}
                 />
 
-                <small
-                  style={{
-                    display: "block",
-                    marginTop: "6px",
-                    color: "#6b7280",
-                    fontSize: "12px",
-                  }}
-                >
-                  The current backend requires a
-                  password when updating a user.
-                </small>
-
               </div>
-
-              {/* BUTTONS */}
 
               <div
                 style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "10px",
+                  marginTop: "8px",
+                  padding: "10px 12px",
+                  borderRadius: "7px",
+                  background: "#f9fafb",
+                  color: "#6b7280",
+                  fontSize: "11px",
                 }}
               >
+                Leave the password field blank if you do not
+                want to change the user's password.
+              </div>
+
+              <div style={modalActionsStyle}>
 
                 <button
                   type="button"
                   onClick={closeEditModal}
+                  style={cancelButtonStyle}
                   disabled={savingUser}
-                  style={{
-                    padding: "10px 18px",
-                    border:
-                      "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    background: "#ffffff",
-                    color: "#374151",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    cursor: savingUser
-                      ? "not-allowed"
-                      : "pointer",
-                  }}
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
+                  style={saveButtonStyle}
                   disabled={savingUser}
-                  style={{
-                    padding: "10px 18px",
-                    border: "none",
-                    borderRadius: "8px",
-                    background: "#ef1b2d",
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    cursor: savingUser
-                      ? "not-allowed"
-                      : "pointer",
-                    opacity: savingUser ? 0.7 : 1,
-                  }}
                 >
                   {savingUser
                     ? "Saving..."
@@ -1542,10 +1147,199 @@ function Users() {
           </div>
 
         </div>
+
       )}
 
     </main>
   );
 }
+
+// ==========================================
+// FORM COMPONENTS
+// ==========================================
+
+function FormField({
+  label,
+  name,
+  type = "text",
+  value,
+  onChange,
+  placeholder,
+}) {
+  return (
+    <label style={fieldStyle}>
+
+      <span style={fieldLabelStyle}>
+        {label}
+      </span>
+
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        style={inputStyle}
+      />
+
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+}) {
+  return (
+    <label style={fieldStyle}>
+
+      <span style={fieldLabelStyle}>
+        {label}
+      </span>
+
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        style={inputStyle}
+      >
+        {options.map((option) => (
+          <option
+            key={option}
+            value={option}
+          >
+            {option}
+          </option>
+        ))}
+      </select>
+
+    </label>
+  );
+}
+
+// ==========================================
+// MODAL STYLES
+// ==========================================
+
+const modalOverlayStyle = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 1000,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "20px",
+  background: "rgba(17, 24, 39, 0.45)",
+};
+
+const modalStyle = {
+  width: "100%",
+  maxWidth: "620px",
+  maxHeight: "90vh",
+  overflowY: "auto",
+  padding: "24px",
+  borderRadius: "12px",
+  background: "#ffffff",
+  boxShadow: "0 20px 50px rgba(0, 0, 0, 0.18)",
+};
+
+const modalHeaderStyle = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "20px",
+  marginBottom: "22px",
+};
+
+const modalTitleStyle = {
+  margin: 0,
+  color: "#111827",
+  fontSize: "20px",
+  fontWeight: 700,
+};
+
+const modalSubtitleStyle = {
+  margin: "5px 0 0",
+  color: "#6b7280",
+  fontSize: "12px",
+};
+
+const closeButtonStyle = {
+  width: "32px",
+  height: "32px",
+  border: "1px solid #e5e7eb",
+  borderRadius: "7px",
+  background: "#ffffff",
+  color: "#6b7280",
+  fontSize: "20px",
+  lineHeight: 1,
+  cursor: "pointer",
+};
+
+const formGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "16px",
+};
+
+const fieldStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "6px",
+};
+
+const fieldLabelStyle = {
+  color: "#374151",
+  fontSize: "12px",
+  fontWeight: 600,
+};
+
+const inputStyle = {
+  width: "100%",
+  height: "40px",
+  padding: "0 11px",
+  border: "1px solid #d1d5db",
+  borderRadius: "7px",
+  outline: "none",
+  background: "#ffffff",
+  color: "#111827",
+  fontSize: "12px",
+};
+
+const modalActionsStyle = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "10px",
+  marginTop: "24px",
+  paddingTop: "18px",
+  borderTop: "1px solid #eeeeee",
+};
+
+const cancelButtonStyle = {
+  height: "38px",
+  padding: "0 16px",
+  border: "1px solid #e5e7eb",
+  borderRadius: "7px",
+  background: "#ffffff",
+  color: "#374151",
+  fontSize: "12px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const saveButtonStyle = {
+  height: "38px",
+  padding: "0 18px",
+  border: "1px solid #ef2929",
+  borderRadius: "7px",
+  background: "#ef2929",
+  color: "#ffffff",
+  fontSize: "12px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
 
 export default Users;
