@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./Users.css";
 
 const API_URL = "http://127.0.0.1:8000";
@@ -88,7 +88,7 @@ function Users() {
   // LOAD USERS
   // ==========================================
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     const token = getToken();
 
     const response = await fetch(`${API_URL}/users`, {
@@ -107,7 +107,7 @@ function Users() {
     }
 
     return data.users || [];
-  };
+  }, []);
 
   // ==========================================
   // INITIAL LOAD

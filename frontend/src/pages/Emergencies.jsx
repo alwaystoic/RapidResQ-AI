@@ -9,6 +9,7 @@ function Emergencies() {
   const [error, setError] = useState("");
   const [completingId, setCompletingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // ==========================================
   // NAVIGATION
@@ -19,7 +20,53 @@ function Emergencies() {
   };
 
   // ==========================================
-  // LOAD EMERGENCIES
+  // GET TOKEN
+  // ==========================================
+
+  const getToken = () => {
+    return localStorage.getItem("access_token");
+  };
+
+  // ==========================================
+  // FETCH EMERGENCIES
+  // ==========================================
+
+  const fetchEmergencies = async () => {
+    const token = getToken();
+
+    if (!token) {
+      throw new Error("You are not logged in.");
+    }
+
+    const response = await fetch(`${API_URL}/emergencies`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail || "Failed to load emergencies."
+      );
+    }
+
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    if (Array.isArray(data.emergencies)) {
+      return data.emergencies;
+    }
+
+    return [];
+  };
+
+  // ==========================================
+  // INITIAL LOAD
   // ==========================================
 
   useEffect(() => {
@@ -27,64 +74,24 @@ function Emergencies() {
 
     const loadEmergencies = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-
-        if (!token) {
-          if (!cancelled) {
-            setError("You are not logged in.");
-            setLoading(false);
-          }
-          return;
-        }
-
-        const response = await fetch(`${API_URL}/emergencies`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.detail || "Failed to load emergencies."
-          );
-        }
+        const data = await fetchEmergencies();
 
         if (!cancelled) {
-          /*
-           * Backend may return either:
-           *
-           * [
-           *   {...},
-           *   {...}
-           * ]
-           *
-           * OR:
-           *
-           * {
-           *   emergencies: [...]
-           * }
-           *
-           * Support both formats.
-           */
-          setEmergencies(
-            Array.isArray(data)
-              ? data
-              : data.emergencies || []
-          );
-
+          setEmergencies(data);
           setError("");
-          setLoading(false);
         }
       } catch (err) {
         console.error("Emergency fetch error:", err);
 
         if (!cancelled) {
           setError(
-            err.message || "Unable to load emergencies."
+            err instanceof Error
+              ? err.message
+              : "Unable to load emergencies."
           );
+        }
+      } finally {
+        if (!cancelled) {
           setLoading(false);
         }
       }
@@ -98,46 +105,27 @@ function Emergencies() {
   }, []);
 
   // ==========================================
-  // REFRESH EMERGENCIES
+  // REFRESH
   // ==========================================
 
   const refreshEmergencies = async () => {
     try {
+      setRefreshing(true);
       setError("");
 
-      const token = localStorage.getItem("access_token");
+      const data = await fetchEmergencies();
 
-      if (!token) {
-        setError("You are not logged in.");
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/emergencies`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail || "Failed to load emergencies."
-        );
-      }
-
-      setEmergencies(
-        Array.isArray(data)
-          ? data
-          : data.emergencies || []
-      );
+      setEmergencies(data);
     } catch (err) {
       console.error("Emergency refresh error:", err);
 
       setError(
-        err.message || "Unable to refresh emergencies."
+        err instanceof Error
+          ? err.message
+          : "Unable to refresh emergencies."
       );
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -150,11 +138,10 @@ function Emergencies() {
       setCompletingId(emergencyId);
       setError("");
 
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
 
       if (!token) {
-        setError("You are not logged in.");
-        return;
+        throw new Error("You are not logged in.");
       }
 
       const response = await fetch(
@@ -163,11 +150,12 @@ function Emergencies() {
           method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,
+            Accept: "application/json",
           },
         }
       );
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(
@@ -175,12 +163,16 @@ function Emergencies() {
         );
       }
 
-      await refreshEmergencies();
+      const updatedEmergencies = await fetchEmergencies();
+
+      setEmergencies(updatedEmergencies);
     } catch (err) {
       console.error("Complete emergency error:", err);
 
       setError(
-        err.message || "Unable to complete emergency."
+        err instanceof Error
+          ? err.message
+          : "Unable to complete emergency."
       );
     } finally {
       setCompletingId(null);
@@ -206,11 +198,10 @@ function Emergencies() {
       setDeletingId(emergencyId);
       setError("");
 
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
 
       if (!token) {
-        setError("You are not logged in.");
-        return;
+        throw new Error("You are not logged in.");
       }
 
       const response = await fetch(
@@ -219,11 +210,12 @@ function Emergencies() {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
+            Accept: "application/json",
           },
         }
       );
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(
@@ -231,7 +223,6 @@ function Emergencies() {
         );
       }
 
-      // Remove immediately from the table
       setEmergencies((currentEmergencies) =>
         currentEmergencies.filter(
           (emergency) => emergency.id !== emergencyId
@@ -241,7 +232,9 @@ function Emergencies() {
       console.error("Delete emergency error:", err);
 
       setError(
-        err.message || "Unable to delete emergency."
+        err instanceof Error
+          ? err.message
+          : "Unable to delete emergency."
       );
     } finally {
       setDeletingId(null);
@@ -253,17 +246,17 @@ function Emergencies() {
   // ==========================================
 
   const getSeverityClass = (severity) => {
-    switch (severity) {
-      case "Critical":
+    switch (String(severity || "").toLowerCase()) {
+      case "critical":
         return "severity critical";
 
-      case "High":
+      case "high":
         return "severity high";
 
-      case "Medium":
+      case "medium":
         return "severity medium";
 
-      case "Low":
+      case "low":
         return "severity low";
 
       default:
@@ -276,14 +269,14 @@ function Emergencies() {
   // ==========================================
 
   const getStatusClass = (status) => {
-    switch (status) {
-      case "Pending":
+    switch (String(status || "").toLowerCase()) {
+      case "pending":
         return "status pending";
 
-      case "Assigned":
+      case "assigned":
         return "status assigned";
 
-      case "Completed":
+      case "completed":
         return "status completed";
 
       default:
@@ -338,13 +331,9 @@ function Emergencies() {
 
   return (
     <main className="emergencies-main">
-
-      {/* Header */}
+      {/* HEADER */}
       <header className="emergencies-header">
-
         <div>
-
-          {/* BACK TO DASHBOARD */}
           <button
             type="button"
             onClick={goToDashboard}
@@ -373,39 +362,34 @@ function Emergencies() {
           <p>
             Manage and monitor emergency cases
           </p>
-
         </div>
 
         <button
+          type="button"
           className="refresh-button"
           onClick={refreshEmergencies}
+          disabled={refreshing}
         >
-          ↻ Refresh
+          {refreshing ? "↻ Refreshing..." : "↻ Refresh"}
         </button>
-
       </header>
 
-      {/* Error */}
+      {/* ERROR */}
       {error && (
         <div className="error-message">
           {error}
         </div>
       )}
 
-      {/* Statistics */}
+      {/* STATISTICS */}
       <section className="emergency-stats">
-
         <div className="emergency-stat-card">
           <span>Total Emergencies</span>
-
-          <strong>
-            {emergencies.length}
-          </strong>
+          <strong>{emergencies.length}</strong>
         </div>
 
         <div className="emergency-stat-card pending-stat">
           <span>Pending</span>
-
           <strong>
             {
               emergencies.filter(
@@ -418,7 +402,6 @@ function Emergencies() {
 
         <div className="emergency-stat-card assigned-stat">
           <span>Assigned</span>
-
           <strong>
             {
               emergencies.filter(
@@ -431,7 +414,6 @@ function Emergencies() {
 
         <div className="emergency-stat-card critical-stat">
           <span>Critical</span>
-
           <strong>
             {
               emergencies.filter(
@@ -444,7 +426,6 @@ function Emergencies() {
 
         <div className="emergency-stat-card completed-stat">
           <span>Completed</span>
-
           <strong>
             {
               emergencies.filter(
@@ -454,56 +435,39 @@ function Emergencies() {
             }
           </strong>
         </div>
-
       </section>
 
-      {/* Emergency Card */}
+      {/* EMERGENCIES CARD */}
       <section className="emergencies-card">
-
         <div className="card-header">
-
           <div>
-            <h2>
-              All Emergencies
-            </h2>
-
-            <p>
-              All reported emergency cases
-            </p>
+            <h2>All Emergencies</h2>
+            <p>All reported emergency cases</p>
           </div>
 
           <span className="case-count">
-            {emergencies.length} cases
+            {emergencies.length}{" "}
+            {emergencies.length === 1 ? "case" : "cases"}
           </span>
-
         </div>
 
-        {/* Empty */}
+        {/* EMPTY STATE */}
         {emergencies.length === 0 ? (
-
           <div className="empty-state">
-
             <div className="empty-icon">
               🚨
             </div>
 
-            <h3>
-              No emergencies found
-            </h3>
+            <h3>No emergencies found</h3>
 
             <p>
               There are currently no emergency cases
               in the system.
             </p>
-
           </div>
-
         ) : (
-
           <div className="emergency-table-wrapper">
-
             <table className="emergency-table">
-
               <thead>
                 <tr>
                   <th>ID</th>
@@ -520,80 +484,83 @@ function Emergencies() {
               </thead>
 
               <tbody>
-
                 {emergencies.map((emergency) => (
-
                   <tr key={emergency.id}>
-
                     {/* ID */}
                     <td>
                       <strong>
-                        #{String(emergency.id).padStart(3, "0")}
+                        #
+                        {String(emergency.id).padStart(
+                          3,
+                          "0"
+                        )}
                       </strong>
                     </td>
 
-                    {/* Patient */}
+                    {/* PATIENT */}
                     <td>
                       <div className="patient-info">
-
                         <strong>
-                          {emergency.patient_name}
+                          {emergency.patient_name ||
+                            "N/A"}
                         </strong>
 
                         <span>
-                          {emergency.phone}
+                          {emergency.phone || "N/A"}
                         </span>
-
                       </div>
                     </td>
 
-                    {/* Emergency */}
+                    {/* EMERGENCY */}
                     <td>
-                      {emergency.emergency_type}
+                      {emergency.emergency_type ||
+                        "N/A"}
                     </td>
 
-                    {/* Location */}
+                    {/* LOCATION */}
                     <td>
                       <div className="location-info">
-
                         <span>
-                          {emergency.location}
+                          {emergency.location || "N/A"}
                         </span>
 
-                        {emergency.latitude !== undefined &&
-                          emergency.longitude !== undefined && (
+                        {emergency.latitude !==
+                          undefined &&
+                          emergency.longitude !==
+                            undefined && (
                             <small>
                               {emergency.latitude},{" "}
                               {emergency.longitude}
                             </small>
                           )}
-
                       </div>
                     </td>
 
-                    {/* Severity */}
+                    {/* SEVERITY */}
                     <td>
                       <span
                         className={getSeverityClass(
                           emergency.severity
                         )}
                       >
-                        {emergency.severity}
+                        {emergency.severity ||
+                          "Unknown"}
                       </span>
                     </td>
 
-                    {/* Status */}
+                    {/* STATUS */}
                     <td>
                       <span
                         className={getStatusClass(
                           emergency.status
                         )}
                       >
-                        {emergency.status}
+                        {emergency.status ||
+                          "Unknown"}
                       </span>
                     </td>
 
-                    {/* Ambulance */}
+                    {/* AMBULANCE */}
                     <td>
                       {emergency.ambulance_id ? (
                         <span>
@@ -606,7 +573,7 @@ function Emergencies() {
                       )}
                     </td>
 
-                    {/* Hospital */}
+                    {/* HOSPITAL */}
                     <td>
                       {emergency.hospital_id ? (
                         <span>
@@ -619,7 +586,7 @@ function Emergencies() {
                       )}
                     </td>
 
-                    {/* Created */}
+                    {/* CREATED */}
                     <td>
                       <span className="created-date">
                         {formatDate(
@@ -630,7 +597,6 @@ function Emergencies() {
 
                     {/* ACTIONS */}
                     <td>
-
                       <div
                         style={{
                           display: "flex",
@@ -638,11 +604,10 @@ function Emergencies() {
                           gap: "7px",
                         }}
                       >
-
-                        {/* COMPLETE */}
-                        {emergency.status !== "Completed" ? (
-
+                        {emergency.status !==
+                        "Completed" ? (
                           <button
+                            type="button"
                             className="complete-button"
                             onClick={() =>
                               completeEmergency(
@@ -650,24 +615,23 @@ function Emergencies() {
                               )
                             }
                             disabled={
-                              completingId === emergency.id ||
-                              deletingId === emergency.id
+                              completingId ===
+                                emergency.id ||
+                              deletingId ===
+                                emergency.id
                             }
                           >
-                            {completingId === emergency.id
+                            {completingId ===
+                            emergency.id
                               ? "Completing..."
                               : "Complete"}
                           </button>
-
                         ) : (
-
                           <span className="completed-label">
                             ✓ Completed
                           </span>
-
                         )}
 
-                        {/* DELETE */}
                         <button
                           type="button"
                           onClick={() =>
@@ -676,53 +640,50 @@ function Emergencies() {
                             )
                           }
                           disabled={
-                            deletingId === emergency.id ||
-                            completingId === emergency.id
+                            deletingId ===
+                              emergency.id ||
+                            completingId ===
+                              emergency.id
                           }
                           style={{
                             minWidth: "65px",
                             height: "30px",
                             padding: "0 10px",
-                            border: "1px solid #dc2626",
+                            border:
+                              "1px solid #dc2626",
                             borderRadius: "7px",
                             background: "#ffffff",
                             color: "#dc2626",
                             fontSize: "10px",
                             fontWeight: "700",
                             cursor:
-                              deletingId === emergency.id
+                              deletingId ===
+                              emergency.id
                                 ? "not-allowed"
                                 : "pointer",
                             opacity:
-                              deletingId === emergency.id
+                              deletingId ===
+                              emergency.id
                                 ? 0.6
                                 : 1,
-                            transition: "0.2s ease",
+                            transition:
+                              "0.2s ease",
                           }}
                         >
-                          {deletingId === emergency.id
+                          {deletingId ===
+                          emergency.id
                             ? "Deleting..."
                             : "Delete"}
                         </button>
-
                       </div>
-
                     </td>
-
                   </tr>
-
                 ))}
-
               </tbody>
-
             </table>
-
           </div>
-
         )}
-
       </section>
-
     </main>
   );
 }
