@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./Dashboard.css";
+
+const API_URL = "http://127.0.0.1:8000";
 
 function Dashboard() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
   // =========================
@@ -31,11 +34,13 @@ function Dashboard() {
   // FETCH DASHBOARD DATA
   // =========================
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(
+    async (isRefresh = false) => {
       try {
-        setLoading(true);
-        setError("");
+        if (isRefresh) {
+          setRefreshing(true);
+          setError("");
+        }
 
         const token =
           localStorage.getItem("access_token") ||
@@ -48,7 +53,7 @@ function Dashboard() {
         }
 
         const response = await fetch(
-          "http://localhost:8000/dashboard/admin",
+          `${API_URL}/dashboard/admin`,
           {
             method: "GET",
             headers: {
@@ -57,6 +62,8 @@ function Dashboard() {
             },
           }
         );
+
+        const data = await response.json().catch(() => null);
 
         if (!response.ok) {
           if (response.status === 401) {
@@ -72,50 +79,78 @@ function Dashboard() {
           }
 
           throw new Error(
-            "Failed to load dashboard data."
+            data?.detail ||
+              "Failed to load dashboard data."
           );
         }
 
-        const data = await response.json();
-
         setDashboardData(data);
+        setError("");
       } catch (err) {
         console.error("Dashboard error:", err);
-        setError(err.message);
+
+        setError(
+          err?.message ||
+            "Unable to load dashboard data."
+        );
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
-    };
-
-    fetchDashboard();
-  }, []);
+    },
+    []
+  );
 
   // =========================
-  // LOADING
+  // INITIAL LOAD
+  // =========================
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetchDashboard(false);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [fetchDashboard]);
+
+  // =========================
+  // LOADING SCREEN
   // =========================
 
   if (loading) {
     return (
       <div className="dashboard-loading">
-        <h2>Loading RapidResQ Dashboard...</h2>
-        <p>Fetching real-time emergency data.</p>
+        <h2>
+          Loading RapidResQ Dashboard...
+        </h2>
+
+        <p>
+          Fetching real-time emergency data.
+        </p>
       </div>
     );
   }
 
   // =========================
-  // ERROR
+  // ERROR SCREEN
   // =========================
 
-  if (error) {
+  if (error && !dashboardData) {
     return (
       <div className="dashboard-error">
-        <h2>Unable to load dashboard</h2>
+        <h2>
+          Unable to load dashboard
+        </h2>
 
-        <p>{error}</p>
+        <p>
+          {error}
+        </p>
 
         <button
-          onClick={() => window.location.reload()}
+          type="button"
+          onClick={() => fetchDashboard(true)}
           className="login-button"
         >
           Try Again
@@ -125,40 +160,110 @@ function Dashboard() {
   }
 
   // =========================
-  // SAFETY CHECK
+  // SAFE DATA
   // =========================
 
-  if (!dashboardData) {
-    return (
-      <div className="dashboard-error">
-        <h2>No dashboard data available</h2>
+  const emergencies =
+    dashboardData?.emergencies || {
+      total: 0,
+      pending: 0,
+      assigned: 0,
+      completed: 0,
+      critical: 0,
+    };
 
-        <button
-          onClick={() => window.location.reload()}
-          className="login-button"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
+  const ambulances =
+    dashboardData?.ambulances || {
+      available: 0,
+      busy: 0,
+    };
 
-  const emergencies = dashboardData.emergencies;
-  const ambulances = dashboardData.ambulances;
-  const hospitals = dashboardData.hospitals;
+  const hospitals =
+    dashboardData?.hospitals || {
+      total: 0,
+      available_beds: 0,
+    };
+
+  // =========================
+  // ADMIN INFORMATION
+  // =========================
+
+  const loggedInEmail =
+    dashboardData?.logged_in_as ||
+    localStorage.getItem("user_email") ||
+    "Administrator";
+
+  const displayName = loggedInEmail.includes("@")
+    ? loggedInEmail.split("@")[0]
+    : loggedInEmail;
+
+  const avatarLetter =
+    displayName.charAt(0).toUpperCase() || "A";
+
+  // =========================
+  // NUMERIC VALUES
+  // =========================
+
+  const totalEmergencies = Number(
+    emergencies.total || 0
+  );
+
+  const pendingEmergencies = Number(
+    emergencies.pending || 0
+  );
+
+  const assignedEmergencies = Number(
+    emergencies.assigned || 0
+  );
+
+  const completedEmergencies = Number(
+    emergencies.completed || 0
+  );
+
+  const criticalEmergencies = Number(
+    emergencies.critical || 0
+  );
+
+  const availableAmbulances = Number(
+    ambulances.available || 0
+  );
+
+  const busyAmbulances = Number(
+    ambulances.busy || 0
+  );
 
   const totalAmbulances =
-    ambulances.available + ambulances.busy;
+    availableAmbulances + busyAmbulances;
+
+  const totalHospitals = Number(
+    hospitals.total || 0
+  );
+
+  const availableBeds = Number(
+    hospitals.available_beds || 0
+  );
+
+  // =========================
+  // AMBULANCE PERCENTAGES
+  // =========================
 
   const availablePercentage =
     totalAmbulances > 0
-      ? (ambulances.available / totalAmbulances) * 100
+      ? (availableAmbulances /
+          totalAmbulances) *
+        100
       : 0;
 
   const busyPercentage =
     totalAmbulances > 0
-      ? (ambulances.busy / totalAmbulances) * 100
+      ? (busyAmbulances /
+          totalAmbulances) *
+        100
       : 0;
+
+  // =========================
+  // DASHBOARD
+  // =========================
 
   return (
     <div className="dashboard">
@@ -174,7 +279,7 @@ function Dashboard() {
         <div className="sidebar-brand">
 
           <div className="sidebar-logo">
-            ✚
+            +
           </div>
 
           <span>
@@ -183,67 +288,60 @@ function Dashboard() {
 
         </div>
 
-
-        {/* =========================
-            MAIN NAVIGATION
-        ========================= */}
+        {/* NAVIGATION */}
 
         <nav className="sidebar-nav">
-
-          {/* DASHBOARD */}
 
           <button
             type="button"
             className="nav-item active"
-            onClick={() => navigateTo("/dashboard")}
+            onClick={() =>
+              navigateTo("/dashboard")
+            }
           >
             <span>▦</span>
             Dashboard
           </button>
 
-
-          {/* EMERGENCIES */}
-
           <button
             type="button"
             className="nav-item"
-            onClick={() => navigateTo("/emergencies")}
+            onClick={() =>
+              navigateTo("/emergencies")
+            }
           >
             <span>🚨</span>
             Emergencies
           </button>
 
-
-          {/* AMBULANCES */}
-
           <button
             type="button"
             className="nav-item"
-            onClick={() => navigateTo("/ambulances")}
+            onClick={() =>
+              navigateTo("/ambulances")
+            }
           >
             <span>🚑</span>
             Ambulances
           </button>
 
-
-          {/* HOSPITALS */}
-
           <button
             type="button"
             className="nav-item"
-            onClick={() => navigateTo("/hospitals")}
+            onClick={() =>
+              navigateTo("/hospitals")
+            }
           >
             <span>🏥</span>
             Hospitals
           </button>
 
-
-          {/* USERS */}
-
           <button
             type="button"
             className="nav-item"
-            onClick={() => navigateTo("/users")}
+            onClick={() =>
+              navigateTo("/users")
+            }
           >
             <span>👥</span>
             Users
@@ -251,28 +349,22 @@ function Dashboard() {
 
         </nav>
 
-
-        {/* =========================
-            BOTTOM NAVIGATION
-        ========================= */}
+        {/* SIDEBAR BOTTOM */}
 
         <div className="sidebar-bottom">
-
-          {/* SETTINGS */}
 
           <button
             type="button"
             className="nav-item"
-            onClick={() => {
-              console.log("Settings page coming soon.");
-            }}
+            onClick={() =>
+              console.log(
+                "Settings page coming soon."
+              )
+            }
           >
             <span>⚙</span>
             Settings
           </button>
-
-
-          {/* LOGOUT */}
 
           <button
             type="button"
@@ -287,16 +379,13 @@ function Dashboard() {
 
       </aside>
 
-
       {/* =========================
-          MAIN CONTENT
+          MAIN
       ========================= */}
 
       <main className="dashboard-main">
 
-        {/* =========================
-            HEADER
-        ========================= */}
+        {/* HEADER */}
 
         <header className="dashboard-header">
 
@@ -312,23 +401,29 @@ function Dashboard() {
 
           </div>
 
-
-          {/* ADMIN PROFILE */}
-
           <div className="admin-profile">
 
-            <div className="notification">
+            <button
+              type="button"
+              className="notification"
+              title="Notifications"
+              onClick={() =>
+                console.log(
+                  "Notifications coming soon."
+                )
+              }
+            >
               🔔
-            </div>
+            </button>
 
             <div className="profile-avatar">
-              A
+              {avatarLetter}
             </div>
 
             <div className="profile-info">
 
               <strong>
-                Admin
+                {displayName}
               </strong>
 
               <span>
@@ -341,9 +436,8 @@ function Dashboard() {
 
         </header>
 
-
         {/* =========================
-            WELCOME SECTION
+            WELCOME
         ========================= */}
 
         <section className="welcome-section">
@@ -351,7 +445,7 @@ function Dashboard() {
           <div>
 
             <h2>
-              Good morning, Admin 👋
+              Good day, {displayName} 👋
             </h2>
 
             <p>
@@ -360,7 +454,6 @@ function Dashboard() {
             </p>
 
           </div>
-
 
           <div className="live-status">
 
@@ -372,14 +465,57 @@ function Dashboard() {
 
         </section>
 
+        {/* =========================
+            REFRESH
+        ========================= */}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "14px",
+          }}
+        >
+
+          <button
+            type="button"
+            onClick={() =>
+              fetchDashboard(true)
+            }
+            disabled={refreshing}
+            style={{
+              minWidth: "95px",
+              height: "36px",
+              padding: "0 14px",
+              border:
+                "1px solid #dedede",
+              borderRadius: "8px",
+              background: "#ffffff",
+              color: "#444444",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: refreshing
+                ? "not-allowed"
+                : "pointer",
+              opacity: refreshing
+                ? 0.6
+                : 1,
+            }}
+          >
+            {refreshing
+              ? "Refreshing..."
+              : "↻ Refresh"}
+          </button>
+
+        </div>
 
         {/* =========================
-            STATISTICS
+            STAT CARDS
         ========================= */}
 
         <section className="stats-grid">
 
-          {/* TOTAL EMERGENCIES */}
+          {/* TOTAL */}
 
           <div className="stat-card">
 
@@ -394,7 +530,7 @@ function Dashboard() {
               </p>
 
               <h3>
-                {emergencies.total}
+                {totalEmergencies}
               </h3>
 
               <span className="stat-description">
@@ -404,7 +540,6 @@ function Dashboard() {
             </div>
 
           </div>
-
 
           {/* PENDING */}
 
@@ -421,7 +556,7 @@ function Dashboard() {
               </p>
 
               <h3>
-                {emergencies.pending}
+                {pendingEmergencies}
               </h3>
 
               <span className="stat-description">
@@ -431,7 +566,6 @@ function Dashboard() {
             </div>
 
           </div>
-
 
           {/* ASSIGNED */}
 
@@ -448,7 +582,7 @@ function Dashboard() {
               </p>
 
               <h3>
-                {emergencies.assigned}
+                {assignedEmergencies}
               </h3>
 
               <span className="stat-description">
@@ -458,7 +592,6 @@ function Dashboard() {
             </div>
 
           </div>
-
 
           {/* COMPLETED */}
 
@@ -475,7 +608,7 @@ function Dashboard() {
               </p>
 
               <h3>
-                {emergencies.completed}
+                {completedEmergencies}
               </h3>
 
               <span className="stat-description">
@@ -488,19 +621,17 @@ function Dashboard() {
 
         </section>
 
-
         {/* =========================
-            MAIN GRID
+            DASHBOARD GRID
         ========================= */}
 
         <section className="dashboard-grid">
-
 
           {/* =========================
               EMERGENCY OVERVIEW
           ========================= */}
 
-          <div className="dashboard-card emergencies-card">
+          <div className="dashboard-card">
 
             <div className="card-header">
 
@@ -516,22 +647,21 @@ function Dashboard() {
 
               </div>
 
-
-              {/* VIEW ALL */}
-
               <button
                 type="button"
                 className="view-all"
-                onClick={() => navigateTo("/emergencies")}
+                onClick={() =>
+                  navigateTo(
+                    "/emergencies"
+                  )
+                }
               >
                 View all →
               </button>
 
             </div>
 
-
             <div className="emergency-list">
-
 
               {/* TOTAL */}
 
@@ -554,7 +684,7 @@ function Dashboard() {
                 </div>
 
                 <span className="severity critical">
-                  {emergencies.total}
+                  {totalEmergencies}
                 </span>
 
                 <span className="status assigned">
@@ -562,7 +692,6 @@ function Dashboard() {
                 </span>
 
               </div>
-
 
               {/* PENDING */}
 
@@ -585,7 +714,7 @@ function Dashboard() {
                 </div>
 
                 <span className="severity high">
-                  {emergencies.pending}
+                  {pendingEmergencies}
                 </span>
 
                 <span className="status pending">
@@ -593,7 +722,6 @@ function Dashboard() {
                 </span>
 
               </div>
-
 
               {/* CRITICAL */}
 
@@ -616,7 +744,7 @@ function Dashboard() {
                 </div>
 
                 <span className="severity critical">
-                  {emergencies.critical}
+                  {criticalEmergencies}
                 </span>
 
                 <span className="status pending">
@@ -624,7 +752,6 @@ function Dashboard() {
                 </span>
 
               </div>
-
 
               {/* COMPLETED */}
 
@@ -647,7 +774,7 @@ function Dashboard() {
                 </div>
 
                 <span className="severity medium">
-                  {emergencies.completed}
+                  {completedEmergencies}
                 </span>
 
                 <span className="status completed">
@@ -660,12 +787,11 @@ function Dashboard() {
 
           </div>
 
-
           {/* =========================
               AMBULANCE STATUS
           ========================= */}
 
-          <div className="dashboard-card ambulance-card">
+          <div className="dashboard-card">
 
             <div className="card-header">
 
@@ -681,8 +807,19 @@ function Dashboard() {
 
               </div>
 
-            </div>
+              <button
+                type="button"
+                className="view-all"
+                onClick={() =>
+                  navigateTo(
+                    "/ambulances"
+                  )
+                }
+              >
+                View all →
+              </button>
 
+            </div>
 
             {/* AVAILABLE */}
 
@@ -695,11 +832,10 @@ function Dashboard() {
                 </span>
 
                 <strong>
-                  {ambulances.available}
+                  {availableAmbulances}
                 </strong>
 
               </div>
-
 
               <div className="progress-bar">
 
@@ -714,7 +850,6 @@ function Dashboard() {
 
             </div>
 
-
             {/* BUSY */}
 
             <div className="ambulance-stat">
@@ -726,11 +861,10 @@ function Dashboard() {
                 </span>
 
                 <strong>
-                  {ambulances.busy}
+                  {busyAmbulances}
                 </strong>
 
               </div>
-
 
               <div className="progress-bar">
 
@@ -745,8 +879,7 @@ function Dashboard() {
 
             </div>
 
-
-            {/* TOTAL FLEET */}
+            {/* TOTAL */}
 
             <div className="ambulance-stat">
 
@@ -761,7 +894,6 @@ function Dashboard() {
                 </strong>
 
               </div>
-
 
               <div className="progress-bar">
 
@@ -780,17 +912,25 @@ function Dashboard() {
 
         </section>
 
-
         {/* =========================
             BOTTOM CARDS
         ========================= */}
 
         <section className="bottom-grid">
 
-
           {/* HOSPITALS */}
 
-          <div className="small-card">
+          <div
+            className="small-card"
+            style={{
+              cursor: "pointer",
+            }}
+            onClick={() =>
+              navigateTo(
+                "/hospitals"
+              )
+            }
+          >
 
             <div className="small-card-icon">
               🏥
@@ -803,7 +943,7 @@ function Dashboard() {
               </span>
 
               <strong>
-                {hospitals.total}
+                {totalHospitals}
               </strong>
 
               <small>
@@ -814,10 +954,19 @@ function Dashboard() {
 
           </div>
 
-
           {/* AVAILABLE BEDS */}
 
-          <div className="small-card">
+          <div
+            className="small-card"
+            style={{
+              cursor: "pointer",
+            }}
+            onClick={() =>
+              navigateTo(
+                "/hospitals"
+              )
+            }
+          >
 
             <div className="small-card-icon">
               🛏️
@@ -830,7 +979,7 @@ function Dashboard() {
               </span>
 
               <strong>
-                {hospitals.available_beds}
+                {availableBeds}
               </strong>
 
               <small>
@@ -841,10 +990,19 @@ function Dashboard() {
 
           </div>
 
-
           {/* CRITICAL CASES */}
 
-          <div className="small-card">
+          <div
+            className="small-card"
+            style={{
+              cursor: "pointer",
+            }}
+            onClick={() =>
+              navigateTo(
+                "/emergencies"
+              )
+            }
+          >
 
             <div className="small-card-icon">
               ⚠️
@@ -857,7 +1015,7 @@ function Dashboard() {
               </span>
 
               <strong>
-                {emergencies.critical}
+                {criticalEmergencies}
               </strong>
 
               <small>
