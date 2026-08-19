@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import "./Hospital.css";
 
+const API_URL = "http://127.0.0.1:8000";
+
 function Hospital({ onNavigate }) {
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,9 +25,9 @@ function Hospital({ onNavigate }) {
     localStorage.getItem("access_token") ||
     localStorage.getItem("token");
 
-  // =========================
+  // ==========================================
   // FETCH HOSPITALS
-  // =========================
+  // ==========================================
 
   const fetchHospitals = useCallback(async () => {
     try {
@@ -33,16 +35,15 @@ function Hospital({ onNavigate }) {
         throw new Error("Session expired. Please login again.");
       }
 
-      const response = await fetch(
-        "http://127.0.0.1:8000/hospitals",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/hospitals`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -55,32 +56,56 @@ function Hospital({ onNavigate }) {
           );
         }
 
-        throw new Error("Failed to load hospitals.");
+        throw new Error(
+          data?.detail || "Failed to load hospitals."
+        );
       }
 
-      const data = await response.json();
+      /*
+       * Backend currently returns:
+       *
+       * {
+       *   logged_in_as: "...",
+       *   hospitals: [...]
+       * }
+       *
+       * This also safely supports a direct array response.
+       */
 
-      setHospitals(data.hospitals || []);
+      const hospitalList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.hospitals)
+          ? data.hospitals
+          : [];
+
+      setHospitals(hospitalList);
       setError("");
     } catch (err) {
-      console.error("Hospital error:", err);
-      setError(err.message);
+      console.error("Hospital fetch error:", err);
+
+      setError(
+        err?.message || "Unable to load hospitals."
+      );
     } finally {
       setLoading(false);
     }
   }, [token]);
 
+  // ==========================================
+  // INITIAL LOAD
+  // ==========================================
+
   useEffect(() => {
-  const loadHospitals = async () => {
-    await fetchHospitals();
-  };
+    const timer = setTimeout(() => {
+      fetchHospitals();
+    }, 0);
 
-  loadHospitals();
-}, [fetchHospitals]);
+    return () => clearTimeout(timer);
+  }, [fetchHospitals]);
 
-  // =========================
+  // ==========================================
   // STATISTICS
-  // =========================
+  // ==========================================
 
   const total = hospitals.length;
 
@@ -89,33 +114,31 @@ function Hospital({ onNavigate }) {
       hospital.status?.toLowerCase() === "available"
   ).length;
 
-  const limited = hospitals.filter(
-    (hospital) => {
-      const beds = Number(hospital.available_beds || 0);
+  const limited = hospitals.filter((hospital) => {
+    const beds = Number(hospital.available_beds || 0);
 
-      return (
-        beds > 0 &&
-        beds <= 10 &&
-        hospital.status?.toLowerCase() !== "unavailable"
-      );
-    }
-  ).length;
+    return (
+      beds > 0 &&
+      beds <= 10 &&
+      hospital.status?.toLowerCase() !== "unavailable"
+    );
+  }).length;
 
-  const full = hospitals.filter(
-    (hospital) => {
-      const beds = Number(hospital.available_beds || 0);
+  const full = hospitals.filter((hospital) => {
+    const beds = Number(hospital.available_beds || 0);
+    const normalizedStatus =
+      hospital.status?.toLowerCase();
 
-      return (
-        beds === 0 ||
-        hospital.status?.toLowerCase() === "unavailable" ||
-        hospital.status?.toLowerCase() === "full"
-      );
-    }
-  ).length;
+    return (
+      beds === 0 ||
+      normalizedStatus === "unavailable" ||
+      normalizedStatus === "full"
+    );
+  }).length;
 
-  // =========================
+  // ==========================================
   // FORM HANDLING
-  // =========================
+  // ==========================================
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
@@ -125,6 +148,10 @@ function Hospital({ onNavigate }) {
       [name]: value,
     }));
   };
+
+  // ==========================================
+  // OPEN ADD FORM
+  // ==========================================
 
   const openAddForm = () => {
     setEditingHospital(null);
@@ -142,6 +169,10 @@ function Hospital({ onNavigate }) {
     setShowForm(true);
   };
 
+  // ==========================================
+  // OPEN EDIT FORM
+  // ==========================================
+
   const openEditForm = (hospital) => {
     setEditingHospital(hospital);
 
@@ -149,60 +180,83 @@ function Hospital({ onNavigate }) {
       name: hospital.name || "",
       location: hospital.location || "",
       contact: hospital.contact || "",
-      available_beds: hospital.available_beds ?? "",
-      latitude: hospital.latitude ?? "",
-      longitude: hospital.longitude ?? "",
-      status: hospital.status || "Available",
+      available_beds:
+        hospital.available_beds ?? "",
+      latitude:
+        hospital.latitude ?? "",
+      longitude:
+        hospital.longitude ?? "",
+      status:
+        hospital.status || "Available",
     });
 
     setShowForm(true);
   };
 
+  // ==========================================
+  // CLOSE FORM
+  // ==========================================
+
   const closeForm = () => {
     setShowForm(false);
     setEditingHospital(null);
+
+    setFormData({
+      name: "",
+      location: "",
+      contact: "",
+      available_beds: "",
+      latitude: "",
+      longitude: "",
+      status: "Available",
+    });
   };
 
-  // =========================
+  // ==========================================
   // CREATE / UPDATE
-  // =========================
+  // ==========================================
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     try {
       if (!token) {
-        throw new Error("Session expired. Please login again.");
+        throw new Error(
+          "Session expired. Please login again."
+        );
       }
-
-      const url = editingHospital
-        ? `http://127.0.0.1:8000/hospitals/${editingHospital.id}`
-        : "http://127.0.0.1:8000/hospitals";
-
-      const method = editingHospital ? "PUT" : "POST";
 
       const payload = {
         name: formData.name.trim(),
         location: formData.location.trim(),
         contact: formData.contact.trim(),
-        available_beds: Number(formData.available_beds),
+        available_beds:
+          Number(formData.available_beds),
         latitude: Number(formData.latitude),
         longitude: Number(formData.longitude),
         status: formData.status,
       };
 
-      if (
-        !payload.name ||
-        !payload.location ||
-        !payload.contact
-      ) {
+      if (!payload.name) {
         throw new Error(
-          "Please fill in all required hospital details."
+          "Hospital name is required."
+        );
+      }
+
+      if (!payload.location) {
+        throw new Error(
+          "Hospital location is required."
+        );
+      }
+
+      if (!payload.contact) {
+        throw new Error(
+          "Hospital contact is required."
         );
       }
 
       if (
-        Number.isNaN(payload.available_beds) ||
+        !Number.isFinite(payload.available_beds) ||
         payload.available_beds < 0
       ) {
         throw new Error(
@@ -211,16 +265,23 @@ function Hospital({ onNavigate }) {
       }
 
       if (
-        Number.isNaN(payload.latitude) ||
-        Number.isNaN(payload.longitude)
+        !Number.isFinite(payload.latitude) ||
+        !Number.isFinite(payload.longitude)
       ) {
         throw new Error(
           "Please enter valid latitude and longitude."
         );
       }
 
+      const isEditing =
+        Boolean(editingHospital);
+
+      const url = isEditing
+        ? `${API_URL}/hospitals/${editingHospital.id}`
+        : `${API_URL}/hospitals`;
+
       const response = await fetch(url, {
-        method,
+        method: isEditing ? "PUT" : "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -228,30 +289,40 @@ function Hospital({ onNavigate }) {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const data = await response
-          .json()
-          .catch(() => null);
+      const data = await response
+        .json()
+        .catch(() => null);
 
+      if (!response.ok) {
         throw new Error(
           data?.detail ||
             `Failed to ${
-              editingHospital ? "update" : "create"
+              isEditing
+                ? "update"
+                : "create"
             } hospital.`
         );
       }
 
       closeForm();
+
       await fetchHospitals();
     } catch (err) {
-      console.error("Save hospital error:", err);
-      alert(err.message);
+      console.error(
+        "Save hospital error:",
+        err
+      );
+
+      alert(
+        err?.message ||
+          "Unable to save hospital."
+      );
     }
   };
 
-  // =========================
+  // ==========================================
   // DELETE
-  // =========================
+  // ==========================================
 
   const handleDelete = async (hospital) => {
     const confirmed = window.confirm(
@@ -264,11 +335,13 @@ function Hospital({ onNavigate }) {
 
     try {
       if (!token) {
-        throw new Error("Session expired. Please login again.");
+        throw new Error(
+          "Session expired. Please login again."
+        );
       }
 
       const response = await fetch(
-        `http://127.0.0.1:8000/hospitals/${hospital.id}`,
+        `${API_URL}/hospitals/${hospital.id}`,
         {
           method: "DELETE",
           headers: {
@@ -278,29 +351,45 @@ function Hospital({ onNavigate }) {
         }
       );
 
-      if (!response.ok) {
-        const data = await response
-          .json()
-          .catch(() => null);
+      const data = await response
+        .json()
+        .catch(() => null);
 
+      if (!response.ok) {
         throw new Error(
-          data?.detail || "Failed to delete hospital."
+          data?.detail ||
+            "Failed to delete hospital."
         );
       }
 
-      await fetchHospitals();
+      // Immediately remove deleted hospital
+      // from the current UI.
+      setHospitals((current) =>
+        current.filter(
+          (item) =>
+            item.id !== hospital.id
+        )
+      );
     } catch (err) {
-      console.error("Delete hospital error:", err);
-      alert(err.message);
+      console.error(
+        "Delete hospital error:",
+        err
+      );
+
+      alert(
+        err?.message ||
+          "Unable to delete hospital."
+      );
     }
   };
 
-  // =========================
+  // ==========================================
   // STATUS CLASS
-  // =========================
+  // ==========================================
 
   const getStatusClass = (status) => {
-    const normalized = status?.toLowerCase();
+    const normalized =
+      status?.toLowerCase();
 
     if (normalized === "available") {
       return "available";
@@ -323,29 +412,38 @@ function Hospital({ onNavigate }) {
     return "unknown";
   };
 
-  // =========================
+  // ==========================================
   // LOADING
-  // =========================
+  // ==========================================
 
   if (loading) {
     return (
       <div className="hospital-page">
-        <div className="hospital-loading">
-          <div className="loading-icon">🏥</div>
 
-          <h2>Loading Hospitals...</h2>
+        <div className="hospital-loading">
+
+          <div className="loading-icon">
+            🏥
+          </div>
+
+          <h2>
+            Loading Hospitals...
+          </h2>
 
           <p>
-            Fetching connected hospital information.
+            Fetching connected hospital
+            information.
           </p>
+
         </div>
+
       </div>
     );
   }
 
-  // =========================
+  // ==========================================
   // PAGE
-  // =========================
+  // ==========================================
 
   return (
     <div className="hospital-page">
@@ -364,7 +462,8 @@ function Hospital({ onNavigate }) {
               if (onNavigate) {
                 onNavigate("/dashboard");
               } else {
-                window.location.href = "/dashboard";
+                window.location.href =
+                  "/dashboard";
               }
             }}
           >
@@ -372,11 +471,16 @@ function Hospital({ onNavigate }) {
           </button>
 
           <div>
-            <h1>Hospitals</h1>
+
+            <h1>
+              Hospitals
+            </h1>
 
             <p>
-              Manage and monitor connected RapidResQ hospitals
+              Manage and monitor connected
+              RapidResQ hospitals
             </p>
+
           </div>
 
         </div>
@@ -411,14 +515,20 @@ function Hospital({ onNavigate }) {
           <span>⚠️</span>
 
           <div>
+
             <strong>
               Unable to load hospitals
             </strong>
 
-            <p>{error}</p>
+            <p>
+              {error}
+            </p>
+
           </div>
 
-          <button onClick={fetchHospitals}>
+          <button
+            onClick={fetchHospitals}
+          >
             Try Again
           </button>
 
@@ -438,13 +548,19 @@ function Hospital({ onNavigate }) {
           </div>
 
           <div>
-            <span>Total Hospitals</span>
 
-            <strong>{total}</strong>
+            <span>
+              Total Hospitals
+            </span>
+
+            <strong>
+              {total}
+            </strong>
 
             <small>
               Connected hospitals
             </small>
+
           </div>
 
         </div>
@@ -456,13 +572,19 @@ function Hospital({ onNavigate }) {
           </div>
 
           <div>
-            <span>Available</span>
 
-            <strong>{available}</strong>
+            <span>
+              Available
+            </span>
+
+            <strong>
+              {available}
+            </strong>
 
             <small>
               Operational hospitals
             </small>
+
           </div>
 
         </div>
@@ -474,13 +596,19 @@ function Hospital({ onNavigate }) {
           </div>
 
           <div>
-            <span>Limited Beds</span>
 
-            <strong>{limited}</strong>
+            <span>
+              Limited Beds
+            </span>
+
+            <strong>
+              {limited}
+            </strong>
 
             <small>
               Low bed availability
             </small>
+
           </div>
 
         </div>
@@ -492,13 +620,19 @@ function Hospital({ onNavigate }) {
           </div>
 
           <div>
-            <span>Full / Unavailable</span>
 
-            <strong>{full}</strong>
+            <span>
+              Full / Unavailable
+            </span>
+
+            <strong>
+              {full}
+            </strong>
 
             <small>
               Require attention
             </small>
+
           </div>
 
         </div>
@@ -514,18 +648,26 @@ function Hospital({ onNavigate }) {
         <div className="hospitals-card-header">
 
           <div>
-            <h2>Hospital Network</h2>
+
+            <h2>
+              Hospital Network
+            </h2>
 
             <p>
-              All connected hospitals in RapidResQ
+              All connected hospitals in
+              RapidResQ
             </p>
+
           </div>
 
           <span className="hospital-count">
+
             {total}{" "}
+
             {total === 1
               ? "hospital"
               : "hospitals"}
+
           </span>
 
         </div>
@@ -534,7 +676,9 @@ function Hospital({ onNavigate }) {
 
           <div className="empty-hospitals">
 
-            <div>🏥</div>
+            <div>
+              🏥
+            </div>
 
             <h3>
               No hospitals found
@@ -545,7 +689,9 @@ function Hospital({ onNavigate }) {
               registered in the system.
             </p>
 
-            <button onClick={openAddForm}>
+            <button
+              onClick={openAddForm}
+            >
               + Add First Hospital
             </button>
 
@@ -560,159 +706,204 @@ function Hospital({ onNavigate }) {
               <thead>
 
                 <tr>
-                  <th>ID</th>
-                  <th>Hospital</th>
-                  <th>Location</th>
-                  <th>Contact</th>
-                  <th>Available Beds</th>
-                  <th>Status</th>
-                  <th>GPS</th>
-                  <th>Actions</th>
+
+                  <th>
+                    ID
+                  </th>
+
+                  <th>
+                    Hospital
+                  </th>
+
+                  <th>
+                    Location
+                  </th>
+
+                  <th>
+                    Contact
+                  </th>
+
+                  <th>
+                    Available Beds
+                  </th>
+
+                  <th>
+                    Status
+                  </th>
+
+                  <th>
+                    GPS
+                  </th>
+
+                  <th>
+                    Actions
+                  </th>
+
                 </tr>
 
               </thead>
 
               <tbody>
 
-                {hospitals.map((hospital) => (
+                {hospitals.map(
+                  (hospital) => (
 
-                  <tr key={hospital.id}>
+                    <tr
+                      key={hospital.id}
+                    >
 
-                    <td>
-                      <span className="hospital-id">
-                        #
-                        {String(hospital.id).padStart(
-                          3,
-                          "0"
-                        )}
-                      </span>
-                    </td>
+                      <td>
 
-                    <td>
+                        <span className="hospital-id">
 
-                      <div className="hospital-name-cell">
+                          #
+                          {String(
+                            hospital.id
+                          ).padStart(
+                            3,
+                            "0"
+                          )}
 
-                        <div className="hospital-icon">
-                          🏥
+                        </span>
+
+                      </td>
+
+                      <td>
+
+                        <div className="hospital-name-cell">
+
+                          <div className="hospital-icon">
+                            🏥
+                          </div>
+
+                          <div>
+
+                            <strong>
+                              {hospital.name}
+                            </strong>
+
+                            <small>
+                              Medical facility
+                            </small>
+
+                          </div>
+
                         </div>
 
-                        <div>
+                      </td>
+
+                      <td>
+
+                        <div className="location-cell">
+
+                          <span>
+                            📍
+                          </span>
+
+                          <span>
+                            {hospital.location ||
+                              "Unknown"}
+                          </span>
+
+                        </div>
+
+                      </td>
+
+                      <td>
+
+                        <div className="contact-cell">
+
+                          📞{" "}
+                          {hospital.contact ||
+                            "N/A"}
+
+                        </div>
+
+                      </td>
+
+                      <td>
+
+                        <div className="beds-cell">
 
                           <strong>
-                            {hospital.name}
+                            {hospital.available_beds}
                           </strong>
 
-                          <small>
-                            Medical facility
-                          </small>
+                          <span>
+                            beds available
+                          </span>
 
                         </div>
 
-                      </div>
+                      </td>
 
-                    </td>
+                      <td>
 
-                    <td>
+                        <span
+                          className={`status-badge ${getStatusClass(
+                            hospital.status
+                          )}`}
+                        >
 
-                      <div className="location-cell">
+                          <span className="status-dot"></span>
 
-                        <span>📍</span>
-
-                        <span>
-                          {hospital.location ||
+                          {hospital.status ||
                             "Unknown"}
+
                         </span>
 
-                      </div>
+                      </td>
 
-                    </td>
+                      <td>
 
-                    <td>
+                        <div className="coordinates">
 
-                      <div className="contact-cell">
-                        📞 {hospital.contact}
-                      </div>
+                          <span>
+                            {hospital.latitude}
+                          </span>
 
-                    </td>
+                          <span>
+                            {hospital.longitude}
+                          </span>
 
-                    <td>
+                        </div>
 
-                      <div className="beds-cell">
+                      </td>
 
-                        <strong>
-                          {hospital.available_beds}
-                        </strong>
+                      <td>
 
-                        <span>
-                          beds available
-                        </span>
+                        <div className="action-buttons">
 
-                      </div>
+                          <button
+                            className="edit-button"
+                            onClick={() =>
+                              openEditForm(
+                                hospital
+                              )
+                            }
+                          >
+                            Edit
+                          </button>
 
-                    </td>
+                          <button
+                            className="delete-button"
+                            onClick={() =>
+                              handleDelete(
+                                hospital
+                              )
+                            }
+                          >
+                            Delete
+                          </button>
 
-                    <td>
+                        </div>
 
-                      <span
-                        className={`status-badge ${getStatusClass(
-                          hospital.status
-                        )}`}
-                      >
+                      </td>
 
-                        <span className="status-dot"></span>
+                    </tr>
 
-                        {hospital.status ||
-                          "Unknown"}
-
-                      </span>
-
-                    </td>
-
-                    <td>
-
-                      <div className="coordinates">
-
-                        <span>
-                          {hospital.latitude}
-                        </span>
-
-                        <span>
-                          {hospital.longitude}
-                        </span>
-
-                      </div>
-
-                    </td>
-
-                    <td>
-
-                      <div className="action-buttons">
-
-                        <button
-                          className="edit-button"
-                          onClick={() =>
-                            openEditForm(hospital)
-                          }
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          className="delete-button"
-                          onClick={() =>
-                            handleDelete(hospital)
-                          }
-                        >
-                          Delete
-                        </button>
-
-                      </div>
-
-                    </td>
-
-                  </tr>
-
-                ))}
+                  )
+                )}
 
               </tbody>
 
@@ -747,15 +938,19 @@ function Hospital({ onNavigate }) {
               <div>
 
                 <h2>
+
                   {editingHospital
                     ? "Edit Hospital"
                     : "Add Hospital"}
+
                 </h2>
 
                 <p>
+
                   {editingHospital
                     ? "Update hospital information"
                     : "Register a new hospital"}
+
                 </p>
 
               </div>
@@ -763,6 +958,7 @@ function Hospital({ onNavigate }) {
               <button
                 className="modal-close"
                 onClick={closeForm}
+                type="button"
               >
                 ×
               </button>
@@ -835,7 +1031,9 @@ function Hospital({ onNavigate }) {
                   type="number"
                   min="0"
                   name="available_beds"
-                  value={formData.available_beds}
+                  value={
+                    formData.available_beds
+                  }
                   onChange={handleInputChange}
                   placeholder="e.g. 50"
                   required
@@ -855,8 +1053,12 @@ function Hospital({ onNavigate }) {
                     type="number"
                     step="any"
                     name="latitude"
-                    value={formData.latitude}
-                    onChange={handleInputChange}
+                    value={
+                      formData.latitude
+                    }
+                    onChange={
+                      handleInputChange
+                    }
                     placeholder="18.5204"
                     required
                   />
@@ -873,8 +1075,12 @@ function Hospital({ onNavigate }) {
                     type="number"
                     step="any"
                     name="longitude"
-                    value={formData.longitude}
-                    onChange={handleInputChange}
+                    value={
+                      formData.longitude
+                    }
+                    onChange={
+                      handleInputChange
+                    }
                     placeholder="73.8567"
                     required
                   />
@@ -929,9 +1135,11 @@ function Hospital({ onNavigate }) {
                   type="submit"
                   className="save-button"
                 >
+
                   {editingHospital
                     ? "Save Changes"
                     : "Add Hospital"}
+
                 </button>
 
               </div>
