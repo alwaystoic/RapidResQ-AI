@@ -3,6 +3,10 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+# ==========================================
+# CREATE AMBULANCE
+# ==========================================
+
 class AmbulanceCreate(BaseModel):
     vehicle: str
     location: str
@@ -13,6 +17,10 @@ class AmbulanceCreate(BaseModel):
     status: Optional[str] = "Available"
 
 
+# ==========================================
+# UPDATE AMBULANCE
+# ==========================================
+
 class AmbulanceUpdate(BaseModel):
     vehicle: str
     location: str
@@ -22,6 +30,10 @@ class AmbulanceUpdate(BaseModel):
 
     status: str
 
+
+# ==========================================
+# AMBULANCE RESPONSE
+# ==========================================
 
 class AmbulanceResponse(BaseModel):
     id: int
