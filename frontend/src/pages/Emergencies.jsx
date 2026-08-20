@@ -10,6 +10,18 @@ function Emergencies() {
   const [completingId, setCompletingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [form, setForm] = useState({
+    patient_name: "",
+    phone: "",
+    emergency_type: "",
+    location: "",
+    severity: "High",
+    latitude: "",
+    longitude: "",
+  });
 
   // ==========================================
   // NAVIGATION
@@ -130,6 +142,152 @@ function Emergencies() {
   };
 
   // ==========================================
+
+  // ==========================================
+  // CREATE EMERGENCY
+  // ==========================================
+
+  const handleFormChange = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+    setFormError("");
+  };
+
+  const closeCreateForm = () => {
+    if (creating) return;
+    setShowCreateForm(false);
+    setFormError("");
+    setForm({
+      patient_name: "",
+      phone: "",
+      emergency_type: "",
+      location: "",
+      severity: "High",
+      latitude: "",
+      longitude: "",
+    });
+  };
+
+  const useCurrentLocation = () => {
+    setFormError("");
+    if (!navigator.geolocation) {
+      setFormError("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setForm((current) => ({
+          ...current,
+          latitude: position.coords.latitude.toFixed(6),
+          longitude: position.coords.longitude.toFixed(6),
+        }));
+      },
+      () => {
+        setFormError(
+          "Unable to get your current location. Enter latitude and longitude manually."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const createEmergency = async (event) => {
+    event.preventDefault();
+    if (creating) return;
+
+    setFormError("");
+    setError("");
+
+    const patientName = form.patient_name.trim();
+    const phone = form.phone.trim();
+    const emergencyType = form.emergency_type.trim();
+    const location = form.location.trim();
+    const latitude = Number(form.latitude);
+    const longitude = Number(form.longitude);
+
+    if (
+      !patientName ||
+      !phone ||
+      !emergencyType ||
+      !location ||
+      !form.severity ||
+      form.latitude.trim() === "" ||
+      form.longitude.trim() === ""
+    ) {
+      setFormError("Please fill in all fields.");
+      return;
+    }
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      setFormError("Latitude and longitude must be valid numbers.");
+      return;
+    }
+
+    const token = getToken();
+    if (!token) {
+      setFormError("You are not logged in.");
+      return;
+    }
+
+    try {
+      setCreating(true);
+
+      const response = await fetch(`${API_URL}/emergencies`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          patient_name: patientName,
+          phone,
+          emergency_type: emergencyType,
+          location,
+          severity: form.severity,
+          latitude,
+          longitude,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        let message = "Failed to create emergency.";
+
+        if (Array.isArray(data.detail)) {
+          message = data.detail
+            .map((item) => {
+              if (typeof item === "string") return item;
+              const field = Array.isArray(item?.loc)
+                ? item.loc[item.loc.length - 1]
+                : "field";
+              return `${field}: ${item?.msg || "Invalid value"}`;
+            })
+            .join(" | ");
+        } else if (typeof data.detail === "string") {
+          message = data.detail;
+        } else if (typeof data.message === "string") {
+          message = data.message;
+        }
+
+        throw new Error(message);
+      }
+
+      const updatedEmergencies = await fetchEmergencies();
+      setEmergencies(updatedEmergencies);
+      closeCreateForm();
+    } catch (err) {
+      console.error("Create emergency error:", err);
+      setFormError(
+        err instanceof Error ? err.message : "Unable to create emergency."
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
   // COMPLETE EMERGENCY
   // ==========================================
 
@@ -364,6 +522,7 @@ function Emergencies() {
           </p>
         </div>
 
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
         <button
           type="button"
           className="refresh-button"
@@ -372,6 +531,28 @@ function Emergencies() {
         >
           {refreshing ? "↻ Refreshing..." : "↻ Refresh"}
         </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreateForm(true);
+              setFormError("");
+              setError("");
+            }}
+            style={{
+              minHeight: "40px",
+              padding: "0 16px",
+              border: "1px solid #dc2626",
+              borderRadius: "8px",
+              background: "#dc2626",
+              color: "#ffffff",
+              fontSize: "13px",
+              fontWeight: "700",
+              cursor: "pointer",
+            }}
+          >
+            + Create Emergency
+          </button>
+        </div>
       </header>
 
       {/* ERROR */}
@@ -379,6 +560,172 @@ function Emergencies() {
         <div className="error-message">
           {error}
         </div>
+      )}
+
+
+      {showCreateForm && (
+        <section
+          className="emergencies-card"
+          style={{ marginBottom: "18px", border: "1px solid #fecaca" }}
+        >
+          <div className="card-header">
+            <div>
+              <h2>Create Emergency</h2>
+              <p>Submit a new emergency to the RapidResQ backend</p>
+            </div>
+          </div>
+
+          <form
+            onSubmit={createEmergency}
+            style={{
+              padding: "20px",
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "16px",
+            }}
+          >
+            <label style={labelStyle}>
+              Patient Name
+              <input
+                name="patient_name"
+                value={form.patient_name}
+                onChange={handleFormChange}
+                placeholder="e.g. Rahul Sharma"
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Phone
+              <input
+                name="phone"
+                value={form.phone}
+                onChange={handleFormChange}
+                placeholder="e.g. 9876543210"
+                inputMode="tel"
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Emergency Type
+              <input
+                name="emergency_type"
+                value={form.emergency_type}
+                onChange={handleFormChange}
+                placeholder="e.g. Accident, Heart Attack"
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Severity
+              <select
+                name="severity"
+                value={form.severity}
+                onChange={handleFormChange}
+                style={inputStyle}
+              >
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </label>
+
+            <label style={labelStyle}>
+              Location
+              <input
+                name="location"
+                value={form.location}
+                onChange={handleFormChange}
+                placeholder="e.g. Shivajinagar, Pune"
+                style={inputStyle}
+              />
+            </label>
+
+            <div style={{ display: "flex", alignItems: "end" }}>
+              <button
+                type="button"
+                onClick={useCurrentLocation}
+                style={secondaryButtonStyle}
+              >
+                📍 Use Current Location
+              </button>
+            </div>
+
+            <label style={labelStyle}>
+              Latitude
+              <input
+                name="latitude"
+                value={form.latitude}
+                onChange={handleFormChange}
+                placeholder="e.g. 18.5304"
+                inputMode="decimal"
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Longitude
+              <input
+                name="longitude"
+                value={form.longitude}
+                onChange={handleFormChange}
+                placeholder="e.g. 73.8567"
+                inputMode="decimal"
+                style={inputStyle}
+              />
+            </label>
+
+            {formError && (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  padding: "11px 13px",
+                  border: "1px solid #fecaca",
+                  borderRadius: "8px",
+                  background: "#fef2f2",
+                  color: "#b91c1c",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                }}
+              >
+                {formError}
+              </div>
+            )}
+
+            <div
+              style={{
+                gridColumn: "1 / -1",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={closeCreateForm}
+                disabled={creating}
+                style={cancelButtonStyle}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={creating}
+                style={{
+                  ...primaryButtonStyle,
+                  opacity: creating ? 0.65 : 1,
+                  cursor: creating ? "not-allowed" : "pointer",
+                }}
+              >
+                {creating ? "Creating..." : "Create Emergency"}
+              </button>
+            </div>
+          </form>
+        </section>
       )}
 
       {/* STATISTICS */}
@@ -687,5 +1034,63 @@ function Emergencies() {
     </main>
   );
 }
+
+
+const labelStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "7px",
+  color: "#374151",
+  fontSize: "13px",
+  fontWeight: "700",
+};
+
+const inputStyle = {
+  width: "100%",
+  minHeight: "40px",
+  boxSizing: "border-box",
+  padding: "9px 11px",
+  border: "1px solid #d1d5db",
+  borderRadius: "7px",
+  background: "#ffffff",
+  color: "#111827",
+  fontSize: "13px",
+};
+
+const primaryButtonStyle = {
+  minHeight: "40px",
+  padding: "0 17px",
+  border: "1px solid #dc2626",
+  borderRadius: "8px",
+  background: "#dc2626",
+  color: "#ffffff",
+  fontSize: "13px",
+  fontWeight: "700",
+};
+
+const secondaryButtonStyle = {
+  width: "100%",
+  minHeight: "40px",
+  padding: "0 13px",
+  border: "1px solid #d1d5db",
+  borderRadius: "7px",
+  background: "#ffffff",
+  color: "#374151",
+  fontSize: "13px",
+  fontWeight: "600",
+  cursor: "pointer",
+};
+
+const cancelButtonStyle = {
+  minHeight: "40px",
+  padding: "0 17px",
+  border: "1px solid #d1d5db",
+  borderRadius: "8px",
+  background: "#ffffff",
+  color: "#374151",
+  fontSize: "13px",
+  fontWeight: "700",
+  cursor: "pointer",
+};
 
 export default Emergencies;
