@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from "react-router-dom";
 
 import Dashboard from "./pages/Dashboard";
 import CitizenDashboard from "./pages/CitizenDashboard";
-import Emergencies from "./pages/Emergencies";
+
 import Ambulances from "./pages/Ambulances";
+import Emergencies from "./pages/Emergencies";
 import Hospital from "./pages/Hospital";
 import Users from "./pages/Users";
 
@@ -11,37 +19,107 @@ import "./App.css";
 
 
 // ============================================================
-// JWT ROLE HELPER
+// BACKEND URL
+// ============================================================
+
+const API_BASE_URL = "http://127.0.0.1:8000";
+
+
+// ============================================================
+// GET ROLE FROM JWT TOKEN
 // ============================================================
 
 function getRoleFromToken(token) {
   if (!token) {
-    return "";
+    return null;
   }
 
   try {
     const parts = token.split(".");
 
     if (parts.length !== 3) {
-      return "";
+      return null;
     }
 
-    const base64Url = parts[1];
+    let base64 = parts[1];
 
-    const base64 = base64Url
+    base64 = base64
       .replace(/-/g, "+")
       .replace(/_/g, "/");
 
-    const paddedBase64 =
-      base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    while (base64.length % 4 !== 0) {
+      base64 += "=";
+    }
 
-    const payload = JSON.parse(atob(paddedBase64));
+    const decoded = atob(base64);
 
-    return payload.role || "";
+    const payload = JSON.parse(decoded);
+
+    return (
+      payload.role ||
+      payload.user_role ||
+      payload.userRole ||
+      null
+    );
   } catch (error) {
-    console.error("Unable to decode access token:", error);
+    console.error("JWT decoding error:", error);
+    return null;
+  }
+}
+
+
+// ============================================================
+// NORMALIZE ROLE
+// ============================================================
+
+function normalizeRole(role) {
+  if (!role) {
     return "";
   }
+
+  return String(role).trim().toLowerCase();
+}
+
+
+// ============================================================
+// GET CURRENT USER ROLE
+// ============================================================
+
+function getCurrentRole() {
+  const token =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token");
+
+  const storedRole =
+    localStorage.getItem("user_role");
+
+  const tokenRole =
+    getRoleFromToken(token);
+
+  const role =
+    tokenRole || storedRole || "";
+
+  if (tokenRole) {
+    localStorage.setItem(
+      "user_role",
+      tokenRole
+    );
+  }
+
+  return normalizeRole(role);
+}
+
+
+// ============================================================
+// CHECK LOGIN
+// ============================================================
+
+function isAuthenticated() {
+  const token =
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token");
+
+  return Boolean(token);
 }
 
 
@@ -49,39 +127,58 @@ function getRoleFromToken(token) {
 // LOGIN PAGE
 // ============================================================
 
-function LoginPage({ onLogin }) {
+function LoginPage() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
 
   // ==========================================================
-  // LOGIN
+  // HANDLE LOGIN
   // ==========================================================
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleLogin = async (event) => {
+    event.preventDefault();
 
     setError("");
+
+    if (!email.trim() || !password) {
+      setError(
+        "Please enter your email and password."
+      );
+
+      return;
+    }
+
     setLoading(true);
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/auth/login",
+        `${API_BASE_URL}/auth/login`,
         {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json",
           },
+
           body: JSON.stringify({
-            email,
-            password,
+            email: email.trim(),
+            password: password,
           }),
         }
       );
 
-      let data;
+
+      // ------------------------------------------------------
+      // Read response
+      // ------------------------------------------------------
+
+      let data = {};
 
       try {
         data = await response.json();
@@ -89,63 +186,132 @@ function LoginPage({ onLogin }) {
         data = {};
       }
 
+
+      // ------------------------------------------------------
+      // Login failed
+      // ------------------------------------------------------
+
       if (!response.ok) {
-        setError(
+        throw new Error(
           data.detail ||
-            data.message ||
-            "Invalid email or password."
+          data.message ||
+          `Login failed. Status: ${response.status}`
         );
-        return;
       }
 
-      if (!data.access_token) {
-        setError("Login successful, but no access token was received.");
-        return;
+
+      // ------------------------------------------------------
+      // Get access token
+      // ------------------------------------------------------
+
+      const token =
+        data.access_token ||
+        data.accessToken ||
+        data.token;
+
+
+      if (!token) {
+        throw new Error(
+          "Login succeeded but the server did not return an access token."
+        );
       }
 
-      // Store authentication information
-      localStorage.setItem(
-        "access_token",
-        data.access_token
-      );
 
-      // Store email
-      localStorage.setItem(
-        "user_email",
-        data.email || email
-      );
+      // ------------------------------------------------------
+      // Get role
+      // ------------------------------------------------------
 
-      // Determine role
-      const tokenRole = getRoleFromToken(
-        data.access_token
-      );
+      const tokenRole =
+        getRoleFromToken(token);
 
       const role =
-        data.role ||
         tokenRole ||
+        data.role ||
+        data.user_role ||
+        data.userRole ||
         "";
 
-      if (role) {
-        localStorage.setItem(
-          "user_role",
-          role
+
+      if (!role) {
+        throw new Error(
+          "Login succeeded but the user role could not be determined."
         );
       }
 
-      console.log("Login successful");
-      console.log("User role:", role);
 
-      // Tell App that login was successful
-      onLogin({
-        ...data,
-        role,
-      });
+      const normalizedRole =
+        normalizeRole(role);
+
+
+      // ------------------------------------------------------
+      // Store authentication
+      // ------------------------------------------------------
+
+      localStorage.setItem(
+        "access_token",
+        token
+      );
+
+      localStorage.setItem(
+        "user_role",
+        normalizedRole
+      );
+
+      localStorage.setItem(
+        "user_email",
+        email.trim()
+      );
+
+
+      // ------------------------------------------------------
+      // ROLE BASED REDIRECTION
+      // ------------------------------------------------------
+
+      if (normalizedRole === "citizen") {
+        navigate(
+          "/citizen-dashboard",
+          {
+            replace: true,
+          }
+        );
+
+        return;
+      }
+
+
+      if (
+        normalizedRole === "admin" ||
+        normalizedRole === "administrator"
+      ) {
+        navigate(
+          "/dashboard",
+          {
+            replace: true,
+          }
+        );
+
+        return;
+      }
+
+
+      // ------------------------------------------------------
+      // Unknown role
+      // ------------------------------------------------------
+
+      throw new Error(
+        `Unknown user role: ${role}`
+      );
 
     } catch (err) {
-      console.error("Login error:", err);
+      console.error(
+        "Login error:",
+        err
+      );
 
       setError(
-        "Unable to connect to RapidResQ server. Make sure the backend is running."
+        err instanceof Error
+          ? err.message
+          : "Unable to login. Please try again."
       );
     } finally {
       setLoading(false);
@@ -158,113 +324,196 @@ function LoginPage({ onLogin }) {
   // ==========================================================
 
   return (
-    <div className="login-page">
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#f4f6fa",
+        padding: "20px",
+      }}
+    >
 
-      <div className="login-card">
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          background: "#ffffff",
+          borderRadius: "12px",
+          padding: "32px",
+          boxShadow:
+            "0 4px 20px rgba(0, 0, 0, 0.08)",
+        }}
+      >
 
-        {/* Logo */}
-        <div className="login-logo">
+        <div
+          style={{
+            textAlign: "center",
+            marginBottom: "28px",
+          }}
+        >
 
-          <div className="login-logo-icon">
-            +
-          </div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "28px",
+              color: "#111827",
+            }}
+          >
+            RapidResQ AI 🚑
+          </h1>
 
-          <div>
-            <h1>RapidResQ</h1>
-            <p>Emergency Response System</p>
-          </div>
-
-        </div>
-
-
-        {/* Heading */}
-        <div className="login-heading">
-
-          <h2>Welcome back</h2>
-
-          <p>
-            Sign in to your RapidResQ account
+          <p
+            style={{
+              marginTop: "8px",
+              color: "#6b7280",
+            }}
+          >
+            Emergency Response Management System
           </p>
 
         </div>
 
 
-        {/* Error */}
-        {error && (
-          <div className="login-error">
-            {error}
-          </div>
-        )}
+        <form onSubmit={handleLogin}>
 
+          {/* EMAIL */}
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit}>
+          <div
+            style={{
+              marginBottom: "18px",
+            }}
+          >
 
-          {/* Email */}
-          <div className="login-field">
-
-            <label htmlFor="login-email">
+            <label
+              htmlFor="email"
+              style={{
+                display: "block",
+                marginBottom: "7px",
+                fontWeight: "600",
+                color: "#374151",
+              }}
+            >
               Email
             </label>
 
             <input
-              id="login-email"
+              id="email"
               type="email"
               value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
+              onChange={(event) =>
+                setEmail(event.target.value)
               }
               placeholder="Enter your email"
               autoComplete="email"
-              required
+              disabled={loading}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "12px",
+                border:
+                  "1px solid #d1d5db",
+                borderRadius: "7px",
+                fontSize: "15px",
+              }}
             />
 
           </div>
 
 
-          {/* Password */}
-          <div className="login-field login-password-field">
+          {/* PASSWORD */}
 
-            <label htmlFor="login-password">
+          <div
+            style={{
+              marginBottom: "18px",
+            }}
+          >
+
+            <label
+              htmlFor="password"
+              style={{
+                display: "block",
+                marginBottom: "7px",
+                fontWeight: "600",
+                color: "#374151",
+              }}
+            >
               Password
             </label>
 
             <input
-              id="login-password"
+              id="password"
               type="password"
               value={password}
-              onChange={(e) =>
-                setPassword(e.target.value)
+              onChange={(event) =>
+                setPassword(event.target.value)
               }
               placeholder="Enter your password"
               autoComplete="current-password"
-              required
+              disabled={loading}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "12px",
+                border:
+                  "1px solid #d1d5db",
+                borderRadius: "7px",
+                fontSize: "15px",
+              }}
             />
 
           </div>
 
 
-          {/* Login Button */}
+          {/* ERROR */}
+
+          {error && (
+            <div
+              style={{
+                background: "#fee2e2",
+                color: "#b91c1c",
+                border:
+                  "1px solid #fecaca",
+                borderRadius: "7px",
+                padding: "11px",
+                marginBottom: "18px",
+                fontSize: "14px",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+
+          {/* LOGIN BUTTON */}
+
           <button
             type="submit"
-            className={`login-button ${
-              loading ? "loading" : ""
-            }`}
             disabled={loading}
+            style={{
+              width: "100%",
+              padding: "12px",
+              border: "none",
+              borderRadius: "7px",
+              background: loading
+                ? "#9ca3af"
+                : "#dc2626",
+              color: "#ffffff",
+              fontSize: "15px",
+              fontWeight: "600",
+              cursor: loading
+                ? "not-allowed"
+                : "pointer",
+            }}
           >
             {loading
-              ? "Signing in..."
-              : "Sign In"}
+              ? "Logging in..."
+              : "Login"}
           </button>
 
         </form>
 
-
-        {/* Footer */}
-        <p className="login-footer">
-          RapidResQ • Emergency Response Platform
-        </p>
-
       </div>
 
     </div>
@@ -273,204 +522,45 @@ function LoginPage({ onLogin }) {
 
 
 // ============================================================
-// PLACEHOLDER PAGE
+// PROTECTED ROUTE
 // ============================================================
 
-function PlaceholderPage({
-  title,
-  icon,
-  description,
-  onNavigate,
+function ProtectedRoute({
+  allowedRole,
+  children,
 }) {
-  return (
-    <div className="placeholder-page">
+  const authenticated =
+    isAuthenticated();
 
-      <div className="placeholder-card">
-
-        <div className="placeholder-icon">
-          {icon}
-        </div>
-
-        <h1>{title}</h1>
-
-        <p>{description}</p>
-
-        <button
-          onClick={() => {
-            if (onNavigate) {
-              onNavigate("/dashboard");
-            }
-          }}
-        >
-          Back to Dashboard
-        </button>
-
-      </div>
-
-    </div>
-  );
-}
+  const role =
+    getCurrentRole();
 
 
-// ============================================================
-// MAIN APP
-// ============================================================
+  // ----------------------------------------------------------
+  // NOT LOGGED IN
+  // ----------------------------------------------------------
 
-function App() {
-
-  // ==========================================================
-  // AUTHENTICATION
-  // ==========================================================
-
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    () => !!localStorage.getItem("access_token")
-  );
-
-
-  // ==========================================================
-  // USER ROLE
-  // ==========================================================
-
-  const [userRole, setUserRole] = useState(() => {
-
-    const storedRole =
-      localStorage.getItem("user_role");
-
-    if (storedRole) {
-      return storedRole;
-    }
-
-    const token =
-      localStorage.getItem("access_token");
-
-    const tokenRole =
-      getRoleFromToken(token);
-
-    if (tokenRole) {
-      localStorage.setItem(
-        "user_role",
-        tokenRole
-      );
-    }
-
-    return tokenRole;
-  });
-
-
-  // ==========================================================
-  // CURRENT ROUTE
-  // ==========================================================
-
-  const [currentPath, setCurrentPath] =
-    useState(
-      window.location.pathname
+  if (!authenticated) {
+    return (
+      <Navigate
+        to="/"
+        replace
+      />
     );
+  }
 
 
-  // ==========================================================
-  // BROWSER NAVIGATION
-  // ==========================================================
+  // ----------------------------------------------------------
+  // ROLE NOT FOUND
+  // ----------------------------------------------------------
 
-  useEffect(() => {
-
-    const handlePopState = () => {
-      setCurrentPath(
-        window.location.pathname
-      );
-    };
-
-    window.addEventListener(
-      "popstate",
-      handlePopState
-    );
-
-    return () => {
-      window.removeEventListener(
-        "popstate",
-        handlePopState
-      );
-    };
-
-  }, []);
-
-
-  // ==========================================================
-  // NAVIGATION
-  // ==========================================================
-
-  const navigate = (path) => {
-
-    if (
-      window.location.pathname !== path
-    ) {
-      window.history.pushState(
-        {},
-        "",
-        path
-      );
-    }
-
-    setCurrentPath(path);
-  };
-
-
-  // ==========================================================
-  // LOGIN
-  // ==========================================================
-
-  const handleLogin = (data) => {
-
-    const token =
-      localStorage.getItem("access_token");
-
-    const tokenRole =
-      getRoleFromToken(token);
-
-    const role =
-      data?.role ||
-      tokenRole ||
-      localStorage.getItem("user_role") ||
-      "";
-
-    console.log(
-      "Logged-in role:",
-      role
-    );
-
-    if (role) {
-      localStorage.setItem(
-        "user_role",
-        role
-      );
-
-      setUserRole(role);
-    }
-
-    setIsLoggedIn(true);
-
-
-    // Citizen dashboard
-    if (
-      role.toLowerCase() === "citizen"
-    ) {
-      navigate("/citizen-dashboard");
-      return;
-    }
-
-
-    // Admin / other staff dashboard
-    navigate("/dashboard");
-  };
-
-
-  // ==========================================================
-  // LOGOUT
-  // ==========================================================
-
-  const handleLogout = () => {
-
+  if (!role) {
     localStorage.removeItem(
       "access_token"
+    );
+
+    localStorage.removeItem(
+      "token"
     );
 
     localStorage.removeItem(
@@ -481,199 +571,249 @@ function App() {
       "user_email"
     );
 
-    setIsLoggedIn(false);
-    setUserRole("");
-
-    navigate("/");
-  };
-
-
-  // ==========================================================
-  // NOT LOGGED IN
-  // ==========================================================
-
-  if (!isLoggedIn) {
-
     return (
-      <LoginPage
-        onLogin={handleLogin}
+      <Navigate
+        to="/"
+        replace
       />
     );
   }
 
 
-  // ==========================================================
-  // NORMALIZE ROLE
-  // ==========================================================
+  // ----------------------------------------------------------
+  // ROLE DOES NOT MATCH
+  // ----------------------------------------------------------
 
-  const normalizedRole =
-    userRole.toLowerCase();
-
-
-  // ==========================================================
-  // CITIZEN DASHBOARD
-  // ==========================================================
-
-  if (
-    normalizedRole === "citizen" &&
-    (
-      currentPath === "/" ||
-      currentPath === "/dashboard" ||
-      currentPath === "/citizen-dashboard"
-    )
-  ) {
-
-    return (
-      <CitizenDashboard
-        onLogout={handleLogout}
-        onNavigate={navigate}
-      />
-    );
-  }
+  const requiredRole =
+    normalizeRole(allowedRole);
 
 
-  // ==========================================================
-  // ADMIN / STAFF DASHBOARD
-  // ==========================================================
+  if (role !== requiredRole) {
 
-  if (
-    currentPath === "/" ||
-    currentPath === "/dashboard"
-  ) {
-
-    return (
-      <Dashboard
-        onLogout={handleLogout}
-        onNavigate={navigate}
-      />
-    );
-  }
-
-
-  // ==========================================================
-  // CITIZEN DASHBOARD DIRECT ROUTE
-  // ==========================================================
-
-  if (
-    currentPath === "/citizen-dashboard"
-  ) {
-
-    if (
-      normalizedRole === "citizen"
-    ) {
-
+    // Citizen attempting admin page
+    if (role === "citizen") {
       return (
-        <CitizenDashboard
-          onLogout={handleLogout}
-          onNavigate={navigate}
+        <Navigate
+          to="/citizen-dashboard"
+          replace
         />
       );
     }
 
-    navigate("/dashboard");
 
-    return null;
-  }
+    // Admin attempting citizen page
+    if (
+      role === "admin" ||
+      role === "administrator"
+    ) {
+      return (
+        <Navigate
+          to="/dashboard"
+          replace
+        />
+      );
+    }
 
-
-  // ==========================================================
-  // EMERGENCIES
-  // ==========================================================
-
-  if (
-    currentPath === "/emergencies"
-  ) {
 
     return (
-      <Emergencies
-        onLogout={handleLogout}
-        onNavigate={navigate}
+      <Navigate
+        to="/"
+        replace
       />
     );
   }
 
 
-  // ==========================================================
-  // AMBULANCES
-  // ==========================================================
+  return children;
+}
 
-  if (
-    currentPath === "/ambulances"
-  ) {
 
+// ============================================================
+// HOME REDIRECT
+// ============================================================
+
+function HomeRedirect() {
+  const authenticated =
+    isAuthenticated();
+
+  if (!authenticated) {
+    return <LoginPage />;
+  }
+
+
+  const role =
+    getCurrentRole();
+
+
+  if (role === "citizen") {
     return (
-      <Ambulances
-        onLogout={handleLogout}
-        onNavigate={navigate}
+      <Navigate
+        to="/citizen-dashboard"
+        replace
       />
     );
   }
 
 
-  // ==========================================================
-  // HOSPITALS
-  // ==========================================================
-
   if (
-    currentPath === "/hospitals"
+    role === "admin" ||
+    role === "administrator"
   ) {
-
     return (
-      <Hospital
-        onLogout={handleLogout}
-        onNavigate={navigate}
+      <Navigate
+        to="/dashboard"
+        replace
       />
     );
   }
 
 
-  // ==========================================================
-  // USERS
-  // ==========================================================
+  // Invalid authentication
+  localStorage.removeItem(
+    "access_token"
+  );
 
-  if (
-    currentPath === "/users"
-  ) {
+  localStorage.removeItem(
+    "token"
+  );
 
-    return (
-      <Users
-        onLogout={handleLogout}
-        onNavigate={navigate}
-      />
-    );
-  }
+  localStorage.removeItem(
+    "user_role"
+  );
 
-
-  // ==========================================================
-  // SETTINGS
-  // ==========================================================
-
-  if (
-    currentPath === "/settings"
-  ) {
-
-    return (
-      <PlaceholderPage
-        title="Settings"
-        icon="⚙️"
-        description="Settings will be developed next."
-        onNavigate={navigate}
-      />
-    );
-  }
-
-
-  // ==========================================================
-  // UNKNOWN ROUTE
-  // ==========================================================
+  localStorage.removeItem(
+    "user_email"
+  );
 
   return (
-    <PlaceholderPage
-      title="Page Not Found"
-      icon="⚠️"
-      description="The page you are trying to access does not exist."
-      onNavigate={navigate}
+    <Navigate
+      to="/"
+      replace
     />
+  );
+}
+
+
+// ============================================================
+// MAIN APP
+// ============================================================
+
+function App() {
+  return (
+    <BrowserRouter>
+
+      <Routes>
+
+        {/* ==================================================
+            LOGIN / HOME
+            ================================================== */}
+
+        <Route
+          path="/"
+          element={
+            <HomeRedirect />
+          }
+        />
+
+
+        {/* ==================================================
+            ADMIN DASHBOARD
+            ================================================== */}
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute
+              allowedRole="admin"
+            >
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* ==================================================
+            ADMIN PAGES
+            ================================================== */}
+
+        <Route
+          path="/ambulances"
+          element={
+            <ProtectedRoute
+              allowedRole="admin"
+            >
+              <Ambulances />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/emergencies"
+          element={
+            <ProtectedRoute
+              allowedRole="admin"
+            >
+              <Emergencies />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/hospital"
+          element={
+            <ProtectedRoute
+              allowedRole="admin"
+            >
+              <Hospital />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute
+              allowedRole="admin"
+            >
+              <Users />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* ==================================================
+            CITIZEN DASHBOARD
+            ================================================== */}
+
+        <Route
+          path="/citizen-dashboard"
+          element={
+            <ProtectedRoute
+              allowedRole="citizen"
+            >
+              <CitizenDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+
+        {/* ==================================================
+            FALLBACK
+            ================================================== */}
+
+        <Route
+          path="*"
+          element={
+            <HomeRedirect />
+          }
+        />
+
+      </Routes>
+
+    </BrowserRouter>
   );
 }
 

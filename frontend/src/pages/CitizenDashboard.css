@@ -1026,3 +1026,32 @@
     width: 100%;
   }
 }
+
+.citizen-report-emergency-button {
+  border: none;
+  background: #e5252a;
+  color: white;
+
+  padding: 13px 20px;
+
+  border-radius: 10px;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+
+  box-shadow: 0 4px 12px rgba(229, 37, 42, 0.15);
+}
+
+.citizen-report-emergency-button:hover {
+  background: #c91e23;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(229, 37, 42, 0.22);
+}
+
+.citizen-report-emergency-button:active {
+  transform: translateY(0);
+}
