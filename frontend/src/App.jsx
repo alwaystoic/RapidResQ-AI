@@ -1,9 +1,48 @@
 import { useEffect, useState } from "react";
+
 import Dashboard from "./pages/Dashboard";
+import CitizenDashboard from "./pages/CitizenDashboard";
 import Emergencies from "./pages/Emergencies";
 import Ambulances from "./pages/Ambulances";
 import Hospital from "./pages/Hospital";
 import Users from "./pages/Users";
+
+import "./App.css";
+
+
+// ============================================================
+// JWT ROLE HELPER
+// ============================================================
+
+function getRoleFromToken(token) {
+  if (!token) {
+    return "";
+  }
+
+  try {
+    const parts = token.split(".");
+
+    if (parts.length !== 3) {
+      return "";
+    }
+
+    const base64Url = parts[1];
+
+    const base64 = base64Url
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const paddedBase64 =
+      base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+
+    const payload = JSON.parse(atob(paddedBase64));
+
+    return payload.role || "";
+  } catch (error) {
+    console.error("Unable to decode access token:", error);
+    return "";
+  }
+}
 
 
 // ============================================================
@@ -16,7 +55,12 @@ function LoginPage({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = async (e) => {
+
+  // ==========================================================
+  // LOGIN
+  // ==========================================================
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
@@ -31,48 +75,71 @@ function LoginPage({ onLogin }) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            email: email,
-            password: password,
+            email,
+            password,
           }),
         }
       );
 
-      const data = await response.json();
+      let data;
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
 
       if (!response.ok) {
         setError(
-          data.detail || "Invalid email or password."
+          data.detail ||
+            data.message ||
+            "Invalid email or password."
         );
         return;
       }
 
-      // Store authentication data
+      if (!data.access_token) {
+        setError("Login successful, but no access token was received.");
+        return;
+      }
+
+      // Store authentication information
       localStorage.setItem(
         "access_token",
         data.access_token
       );
 
-      if (data.role) {
+      // Store email
+      localStorage.setItem(
+        "user_email",
+        data.email || email
+      );
+
+      // Determine role
+      const tokenRole = getRoleFromToken(
+        data.access_token
+      );
+
+      const role =
+        data.role ||
+        tokenRole ||
+        "";
+
+      if (role) {
         localStorage.setItem(
           "user_role",
-          data.role
+          role
         );
       }
 
-      if (data.email) {
-        localStorage.setItem(
-          "user_email",
-          data.email
-        );
-      } else {
-        localStorage.setItem(
-          "user_email",
-          email
-        );
-      }
+      console.log("Login successful");
+      console.log("User role:", role);
 
-      // Tell App that login succeeded
-      onLogin();
+      // Tell App that login was successful
+      onLogin({
+        ...data,
+        role,
+      });
 
     } catch (err) {
       console.error("Login error:", err);
@@ -85,225 +152,105 @@ function LoginPage({ onLogin }) {
     }
   };
 
+
+  // ==========================================================
+  // LOGIN UI
+  // ==========================================================
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f7f8fa",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          width: "400px",
-          background: "#ffffff",
-          padding: "40px",
-          borderRadius: "16px",
-          boxShadow:
-            "0 10px 40px rgba(0, 0, 0, 0.08)",
-          border: "1px solid #e8e8e8",
-        }}
-      >
+    <div className="login-page">
+
+      <div className="login-card">
 
         {/* Logo */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            marginBottom: "30px",
-          }}
-        >
-          <div
-            style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "10px",
-              background: "#e5252a",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "24px",
-              fontWeight: "bold",
-            }}
-          >
+        <div className="login-logo">
+
+          <div className="login-logo-icon">
             +
           </div>
 
           <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "24px",
-                color: "#171717",
-              }}
-            >
-              RapidResQ
-            </h1>
-
-            <p
-              style={{
-                margin: "3px 0 0",
-                fontSize: "12px",
-                color: "#888",
-              }}
-            >
-              Emergency Response System
-            </p>
+            <h1>RapidResQ</h1>
+            <p>Emergency Response System</p>
           </div>
+
         </div>
 
 
         {/* Heading */}
-        <div
-          style={{
-            marginBottom: "25px",
-          }}
-        >
-          <h2
-            style={{
-              margin: 0,
-              fontSize: "22px",
-              color: "#171717",
-            }}
-          >
-            Welcome back
-          </h2>
+        <div className="login-heading">
 
-          <p
-            style={{
-              margin: "7px 0 0",
-              color: "#777",
-              fontSize: "13px",
-            }}
-          >
+          <h2>Welcome back</h2>
+
+          <p>
             Sign in to your RapidResQ account
           </p>
+
         </div>
 
 
         {/* Error */}
         {error && (
-          <div
-            style={{
-              background: "#fff0f0",
-              border: "1px solid #ffd0d0",
-              color: "#d71920",
-              padding: "11px 13px",
-              borderRadius: "8px",
-              marginBottom: "18px",
-              fontSize: "13px",
-            }}
-          >
+          <div className="login-error">
             {error}
           </div>
         )}
 
 
         {/* Login Form */}
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleSubmit}>
 
           {/* Email */}
-          <div
-            style={{
-              marginBottom: "18px",
-            }}
-          >
-            <label
-              style={{
-                display: "block",
-                marginBottom: "7px",
-                fontSize: "13px",
-                fontWeight: "600",
-                color: "#444",
-              }}
-            >
+          <div className="login-field">
+
+            <label htmlFor="login-email">
               Email
             </label>
 
             <input
+              id="login-email"
               type="email"
               value={email}
               onChange={(e) =>
                 setEmail(e.target.value)
               }
               placeholder="Enter your email"
+              autoComplete="email"
               required
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "12px 13px",
-                border: "1px solid #ddd",
-                borderRadius: "9px",
-                fontSize: "14px",
-                outline: "none",
-              }}
             />
+
           </div>
 
 
           {/* Password */}
-          <div
-            style={{
-              marginBottom: "22px",
-            }}
-          >
-            <label
-              style={{
-                display: "block",
-                marginBottom: "7px",
-                fontSize: "13px",
-                fontWeight: "600",
-                color: "#444",
-              }}
-            >
+          <div className="login-field login-password-field">
+
+            <label htmlFor="login-password">
               Password
             </label>
 
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) =>
                 setPassword(e.target.value)
               }
               placeholder="Enter your password"
+              autoComplete="current-password"
               required
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "12px 13px",
-                border: "1px solid #ddd",
-                borderRadius: "9px",
-                fontSize: "14px",
-                outline: "none",
-              }}
             />
+
           </div>
 
 
           {/* Login Button */}
           <button
             type="submit"
+            className={`login-button ${
+              loading ? "loading" : ""
+            }`}
             disabled={loading}
-            style={{
-              width: "100%",
-              padding: "13px",
-              border: "none",
-              borderRadius: "9px",
-              background: loading
-                ? "#ef6b6f"
-                : "#e5252a",
-              color: "white",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: loading
-                ? "not-allowed"
-                : "pointer",
-            }}
           >
             {loading
               ? "Signing in..."
@@ -314,19 +261,12 @@ function LoginPage({ onLogin }) {
 
 
         {/* Footer */}
-        <p
-          style={{
-            marginTop: "25px",
-            marginBottom: 0,
-            textAlign: "center",
-            color: "#999",
-            fontSize: "11px",
-          }}
-        >
+        <p className="login-footer">
           RapidResQ • Emergency Response Platform
         </p>
 
       </div>
+
     </div>
   );
 }
@@ -340,74 +280,33 @@ function PlaceholderPage({
   title,
   icon,
   description,
+  onNavigate,
 }) {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f7f8fa",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          background: "#ffffff",
-          padding: "50px",
-          borderRadius: "16px",
-          textAlign: "center",
-          boxShadow:
-            "0 10px 40px rgba(0, 0, 0, 0.08)",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "50px",
-            marginBottom: "15px",
-          }}
-        >
+    <div className="placeholder-page">
+
+      <div className="placeholder-card">
+
+        <div className="placeholder-icon">
           {icon}
         </div>
 
-        <h1
-          style={{
-            margin: 0,
-            color: "#171717",
-          }}
-        >
-          {title}
-        </h1>
+        <h1>{title}</h1>
 
-        <p
-          style={{
-            color: "#777",
-            marginTop: "10px",
-          }}
-        >
-          {description}
-        </p>
+        <p>{description}</p>
 
         <button
           onClick={() => {
-            window.location.href =
-              "/dashboard";
-          }}
-          style={{
-            marginTop: "20px",
-            padding: "11px 20px",
-            border: "none",
-            borderRadius: "8px",
-            background: "#e5252a",
-            color: "#ffffff",
-            cursor: "pointer",
-            fontWeight: "600",
+            if (onNavigate) {
+              onNavigate("/dashboard");
+            }
           }}
         >
           Back to Dashboard
         </button>
+
       </div>
+
     </div>
   );
 }
@@ -419,16 +318,49 @@ function PlaceholderPage({
 
 function App() {
 
-  // Check authentication
-  const [isLoggedIn, setIsLoggedIn] =
-    useState(
-      !!localStorage.getItem(
-        "access_token"
-      )
-    );
+  // ==========================================================
+  // AUTHENTICATION
+  // ==========================================================
+
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => !!localStorage.getItem("access_token")
+  );
 
 
-  // Current page
+  // ==========================================================
+  // USER ROLE
+  // ==========================================================
+
+  const [userRole, setUserRole] = useState(() => {
+
+    const storedRole =
+      localStorage.getItem("user_role");
+
+    if (storedRole) {
+      return storedRole;
+    }
+
+    const token =
+      localStorage.getItem("access_token");
+
+    const tokenRole =
+      getRoleFromToken(token);
+
+    if (tokenRole) {
+      localStorage.setItem(
+        "user_role",
+        tokenRole
+      );
+    }
+
+    return tokenRole;
+  });
+
+
+  // ==========================================================
+  // CURRENT ROUTE
+  // ==========================================================
+
   const [currentPath, setCurrentPath] =
     useState(
       window.location.pathname
@@ -436,7 +368,7 @@ function App() {
 
 
   // ==========================================================
-  // Browser navigation
+  // BROWSER NAVIGATION
   // ==========================================================
 
   useEffect(() => {
@@ -463,35 +395,76 @@ function App() {
 
 
   // ==========================================================
-  // Navigate
+  // NAVIGATION
   // ==========================================================
 
   const navigate = (path) => {
 
-    window.history.pushState(
-      {},
-      "",
-      path
-    );
+    if (
+      window.location.pathname !== path
+    ) {
+      window.history.pushState(
+        {},
+        "",
+        path
+      );
+    }
 
     setCurrentPath(path);
   };
 
 
   // ==========================================================
-  // Login
+  // LOGIN
   // ==========================================================
 
-  const handleLogin = () => {
+  const handleLogin = (data) => {
+
+    const token =
+      localStorage.getItem("access_token");
+
+    const tokenRole =
+      getRoleFromToken(token);
+
+    const role =
+      data?.role ||
+      tokenRole ||
+      localStorage.getItem("user_role") ||
+      "";
+
+    console.log(
+      "Logged-in role:",
+      role
+    );
+
+    if (role) {
+      localStorage.setItem(
+        "user_role",
+        role
+      );
+
+      setUserRole(role);
+    }
 
     setIsLoggedIn(true);
 
+
+    // Citizen dashboard
+    if (
+      role.toLowerCase() === "citizen"
+    ) {
+      navigate("/citizen-dashboard");
+      return;
+    }
+
+
+    // Admin / other staff dashboard
     navigate("/dashboard");
   };
 
 
   // ==========================================================
-  // Logout
+  // LOGOUT
   // ==========================================================
 
   const handleLogout = () => {
@@ -509,13 +482,14 @@ function App() {
     );
 
     setIsLoggedIn(false);
+    setUserRole("");
 
     navigate("/");
   };
 
 
   // ==========================================================
-  // Not logged in
+  // NOT LOGGED IN
   // ==========================================================
 
   if (!isLoggedIn) {
@@ -529,7 +503,37 @@ function App() {
 
 
   // ==========================================================
-  // DASHBOARD
+  // NORMALIZE ROLE
+  // ==========================================================
+
+  const normalizedRole =
+    userRole.toLowerCase();
+
+
+  // ==========================================================
+  // CITIZEN DASHBOARD
+  // ==========================================================
+
+  if (
+    normalizedRole === "citizen" &&
+    (
+      currentPath === "/" ||
+      currentPath === "/dashboard" ||
+      currentPath === "/citizen-dashboard"
+    )
+  ) {
+
+    return (
+      <CitizenDashboard
+        onLogout={handleLogout}
+        onNavigate={navigate}
+      />
+    );
+  }
+
+
+  // ==========================================================
+  // ADMIN / STAFF DASHBOARD
   // ==========================================================
 
   if (
@@ -543,6 +547,32 @@ function App() {
         onNavigate={navigate}
       />
     );
+  }
+
+
+  // ==========================================================
+  // CITIZEN DASHBOARD DIRECT ROUTE
+  // ==========================================================
+
+  if (
+    currentPath === "/citizen-dashboard"
+  ) {
+
+    if (
+      normalizedRole === "citizen"
+    ) {
+
+      return (
+        <CitizenDashboard
+          onLogout={handleLogout}
+          onNavigate={navigate}
+        />
+      );
+    }
+
+    navigate("/dashboard");
+
+    return null;
   }
 
 
@@ -567,14 +597,17 @@ function App() {
   // AMBULANCES
   // ==========================================================
 
-  if (currentPath === "/ambulances") {
-  return (
-    <Ambulances
-      onLogout={handleLogout}
-      onNavigate={navigate}
-    />
-  );
-}
+  if (
+    currentPath === "/ambulances"
+  ) {
+
+    return (
+      <Ambulances
+        onLogout={handleLogout}
+        onNavigate={navigate}
+      />
+    );
+  }
 
 
   // ==========================================================
@@ -598,21 +631,17 @@ function App() {
   // USERS
   // ==========================================================
 
-// ==========================================================
-// USERS
-// ==========================================================
+  if (
+    currentPath === "/users"
+  ) {
 
-if (
-  currentPath === "/users"
-) {
-
-  return (
-    <Users
-      onLogout={handleLogout}
-      onNavigate={navigate}
-    />
-  );
-}
+    return (
+      <Users
+        onLogout={handleLogout}
+        onNavigate={navigate}
+      />
+    );
+  }
 
 
   // ==========================================================
@@ -628,6 +657,7 @@ if (
         title="Settings"
         icon="⚙️"
         description="Settings will be developed next."
+        onNavigate={navigate}
       />
     );
   }
@@ -642,6 +672,7 @@ if (
       title="Page Not Found"
       icon="⚠️"
       description="The page you are trying to access does not exist."
+      onNavigate={navigate}
     />
   );
 }

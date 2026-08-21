@@ -28,6 +28,15 @@ class EmergencyUpdate(BaseModel):
     )
 
 
+class AmbulanceResponse(BaseModel):
+    id: int
+    vehicle: str
+    status: str
+    location: str
+    latitude: float
+    longitude: float
+
+
 class EmergencyResponse(BaseModel):
     id: int
 
@@ -36,6 +45,9 @@ class EmergencyResponse(BaseModel):
     emergency_type: str
     location: str
 
+    latitude: float
+    longitude: float
+
     status: str
     severity: str
 
@@ -43,6 +55,14 @@ class EmergencyResponse(BaseModel):
 
     ambulance_id: Optional[int]
     hospital_id: Optional[int]
+
+    ambulance: Optional[AmbulanceResponse] = None
+
+    # Distance from ambulance to emergency
+    distance_km: Optional[float] = None
+
+    # Estimated ambulance arrival time
+    estimated_arrival_minutes: Optional[int] = None
 
     created_at: datetime
 

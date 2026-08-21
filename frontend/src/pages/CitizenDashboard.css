@@ -1,0 +1,1028 @@
+/* ============================================================
+   CITIZEN PORTAL
+============================================================ */
+
+.citizen-app {
+  min-height: 100vh;
+  background: #f7f8fa;
+  color: #171717;
+  font-family: Arial, sans-serif;
+}
+
+
+/* ============================================================
+   HEADER
+============================================================ */
+
+.citizen-header {
+  height: 76px;
+  background: #ffffff;
+  border-bottom: 1px solid #e8e8e8;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 42px;
+  box-sizing: border-box;
+}
+
+.citizen-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-symbol {
+  width: 42px;
+  height: 42px;
+
+  border-radius: 10px;
+  background: #e5252a;
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 25px;
+  font-weight: bold;
+}
+
+.citizen-logo h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.citizen-logo span {
+  display: block;
+  margin-top: 3px;
+
+  color: #888;
+  font-size: 11px;
+}
+
+
+/* ============================================================
+   HEADER USER
+============================================================ */
+
+.citizen-header-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.citizen-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar {
+  width: 38px;
+  height: 38px;
+
+  border-radius: 50%;
+  background: #fff0f0;
+  color: #e5252a;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-weight: bold;
+}
+
+.citizen-user strong {
+  display: block;
+  font-size: 13px;
+}
+
+.citizen-user span {
+  display: block;
+  margin-top: 2px;
+
+  font-size: 11px;
+  color: #888;
+}
+
+.logout-button {
+  border: 1px solid #e5252a;
+  background: white;
+  color: #e5252a;
+
+  padding: 9px 16px;
+  border-radius: 8px;
+
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background: #fff0f0;
+}
+
+
+/* ============================================================
+   MAIN
+============================================================ */
+
+.citizen-main {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 40px 0 60px;
+}
+
+
+/* ============================================================
+   WELCOME
+============================================================ */
+
+.citizen-welcome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 28px;
+}
+
+.welcome-label {
+  margin: 0 0 7px;
+
+  color: #e5252a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.citizen-welcome h1 {
+  margin: 0;
+
+  font-size: 31px;
+  font-weight: 700;
+}
+
+.citizen-welcome h1 span {
+  color: #e5252a;
+}
+
+.citizen-welcome p:not(.welcome-label) {
+  margin: 8px 0 0;
+
+  color: #777;
+  font-size: 14px;
+}
+
+.system-operational {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+
+  padding: 10px 15px;
+  border-radius: 20px;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.system-operational span {
+  width: 8px;
+  height: 8px;
+
+  background: #27ae60;
+  border-radius: 50%;
+}
+
+
+/* ============================================================
+   ALERTS
+============================================================ */
+
+.citizen-error,
+.citizen-success {
+  padding: 13px 16px;
+  border-radius: 9px;
+  margin-bottom: 20px;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.citizen-error {
+  background: #fff0f0;
+  border: 1px solid #ffd0d0;
+  color: #d71920;
+}
+
+.citizen-success {
+  background: #effaf3;
+  border: 1px solid #ccebd6;
+  color: #208a4a;
+}
+
+
+/* ============================================================
+   REPORT EMERGENCY CARD
+============================================================ */
+
+.report-emergency-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+
+  padding: 28px;
+
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    #fff1f1,
+    #ffffff
+  );
+
+  border: 1px solid #ffd5d5;
+  margin-bottom: 30px;
+}
+
+.report-icon {
+  width: 68px;
+  height: 68px;
+
+  flex-shrink: 0;
+
+  border-radius: 16px;
+  background: #e5252a;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 32px;
+}
+
+.report-content h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.report-content p {
+  margin: 7px 0 17px;
+
+  color: #777;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.report-button {
+  border: none;
+  border-radius: 9px;
+
+  padding: 12px 20px;
+
+  background: #e5252a;
+  color: white;
+
+  font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.report-button:hover {
+  background: #c91e23;
+}
+
+
+/* ============================================================
+   ACTIVE EMERGENCY
+============================================================ */
+
+.active-emergency-section {
+  background: #ffffff;
+  border: 1px solid #e7e7e7;
+  border-radius: 16px;
+
+  padding: 26px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 22px;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.section-heading p {
+  margin: 5px 0 0;
+  color: #888;
+  font-size: 12px;
+}
+
+
+/* ============================================================
+   STATUS
+============================================================ */
+
+.status-badge {
+  padding: 7px 12px;
+  border-radius: 20px;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.status-assigned {
+  background: #eaf8ef;
+  color: #208a4a;
+}
+
+.status-pending {
+  background: #fff5e6;
+  color: #c77b00;
+}
+
+.status-completed {
+  background: #edf3ff;
+  color: #356dcc;
+}
+
+.status-cancelled {
+  background: #fff0f0;
+  color: #d71920;
+}
+
+.status-default {
+  background: #f1f1f1;
+  color: #666;
+}
+
+
+/* ============================================================
+   EMPTY
+============================================================ */
+
+.empty-state {
+  padding: 55px 20px;
+  text-align: center;
+
+  border: 1px dashed #ddd;
+  border-radius: 12px;
+}
+
+.empty-icon {
+  font-size: 38px;
+  margin-bottom: 10px;
+}
+
+.empty-state h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.empty-state p {
+  margin: 7px 0 0;
+  color: #888;
+  font-size: 12px;
+}
+
+.loading-spinner {
+  width: 28px;
+  height: 28px;
+
+  margin: 0 auto 12px;
+
+  border: 3px solid #eee;
+  border-top-color: #e5252a;
+
+  border-radius: 50%;
+
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* ============================================================
+   EMERGENCY DETAILS
+============================================================ */
+
+.emergency-details {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.info-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  padding: 15px;
+
+  background: #fafafa;
+  border: 1px solid #eeeeee;
+  border-radius: 11px;
+}
+
+.info-card-icon {
+  width: 40px;
+  height: 40px;
+
+  border-radius: 9px;
+  background: #fff0f0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 19px;
+}
+
+.info-card span {
+  display: block;
+
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.info-card strong {
+  font-size: 13px;
+}
+
+
+/* ============================================================
+   AMBULANCE CARD
+============================================================ */
+
+.ambulance-card {
+  margin-top: 4px;
+
+  border: 1px solid #ffd2d2;
+  border-radius: 14px;
+
+  overflow: hidden;
+}
+
+.ambulance-card-header {
+  padding: 20px;
+
+  background: #fff7f7;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-label {
+  margin: 0 0 6px;
+
+  color: #e5252a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+
+.ambulance-card-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.ambulance-status {
+  padding: 7px 12px;
+
+  border-radius: 20px;
+
+  background: #eaf8ef;
+  color: #208a4a;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ambulance-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+
+  padding: 20px;
+}
+
+.ambulance-vehicle,
+.ambulance-location {
+  padding: 16px;
+
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.ambulance-main span {
+  display: block;
+
+  color: #888;
+  font-size: 11px;
+
+  margin-bottom: 7px;
+}
+
+.ambulance-main strong {
+  display: block;
+  font-size: 16px;
+}
+
+.ambulance-location strong {
+  font-size: 14px;
+}
+
+.ambulance-location small {
+  display: block;
+
+  margin-top: 8px;
+
+  color: #777;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+
+/* ============================================================
+   TRACKING
+============================================================ */
+
+.tracking-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  border-top: 1px solid #eeeeee;
+}
+
+.tracking-item {
+  padding: 20px;
+
+  background: #ffffff;
+}
+
+.tracking-item + .tracking-item {
+  border-left: 1px solid #eeeeee;
+}
+
+.tracking-item span {
+  display: block;
+
+  color: #777;
+  font-size: 11px;
+
+  margin-bottom: 8px;
+}
+
+.tracking-item strong {
+  font-size: 22px;
+  color: #171717;
+}
+
+
+/* ============================================================
+   PENDING
+============================================================ */
+
+.pending-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+
+  padding: 20px;
+
+  background: #fffaf1;
+  border: 1px solid #f4dfb8;
+
+  border-radius: 12px;
+}
+
+.pending-icon {
+  font-size: 32px;
+}
+
+.pending-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.pending-card p {
+  margin: 5px 0 0;
+
+  color: #888;
+  font-size: 12px;
+}
+
+
+/* ============================================================
+   HOSPITAL
+============================================================ */
+
+.hospital-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+
+  padding: 20px;
+
+  border: 1px solid #dbe6f5;
+  border-radius: 12px;
+
+  background: #f8fbff;
+}
+
+.hospital-icon {
+  width: 48px;
+  height: 48px;
+
+  border-radius: 10px;
+  background: #eaf2ff;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 23px;
+}
+
+.hospital-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.hospital-card p:last-child {
+  margin: 5px 0 0;
+
+  color: #777;
+  font-size: 12px;
+}
+
+
+/* ============================================================
+   REPORT PAGE
+============================================================ */
+
+.report-page {
+  max-width: 850px;
+  margin: 0 auto;
+}
+
+.back-button {
+  border: none;
+  background: transparent;
+
+  color: #666;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  margin-bottom: 25px;
+}
+
+.back-button:hover {
+  color: #e5252a;
+}
+
+.report-page-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+
+  margin-bottom: 28px;
+}
+
+.report-page-icon {
+  width: 58px;
+  height: 58px;
+
+  border-radius: 14px;
+  background: #e5252a;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 27px;
+}
+
+.report-page-header h1 {
+  margin: 0;
+
+  font-size: 28px;
+}
+
+.report-page-header p:last-child {
+  margin: 6px 0 0;
+
+  color: #777;
+  font-size: 13px;
+}
+
+
+/* ============================================================
+   FORM
+============================================================ */
+
+.emergency-form {
+  background: #ffffff;
+
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+
+  overflow: hidden;
+}
+
+.form-section {
+  padding: 25px;
+
+  border-bottom: 1px solid #eeeeee;
+}
+
+.form-section h2 {
+  margin: 0 0 20px;
+
+  font-size: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.form-group label {
+  color: #444;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  box-sizing: border-box;
+
+  padding: 12px 13px;
+
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+
+  background: white;
+
+  font-size: 13px;
+  outline: none;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #e5252a;
+  box-shadow: 0 0 0 3px rgba(229, 37, 42, 0.08);
+}
+
+
+/* ============================================================
+   LOCATION
+============================================================ */
+
+.location-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 17px;
+
+  border: 1px solid #e5e5e5;
+  border-radius: 11px;
+
+  background: #fafafa;
+
+  margin-bottom: 18px;
+}
+
+.location-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.location-icon {
+  width: 42px;
+  height: 42px;
+
+  border-radius: 10px;
+  background: #fff0f0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 20px;
+}
+
+.location-display span {
+  display: block;
+
+  color: #888;
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.location-display strong {
+  display: block;
+  font-size: 13px;
+}
+
+.location-display small {
+  display: block;
+
+  color: #888;
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.location-button {
+  flex-shrink: 0;
+
+  padding: 10px 15px;
+
+  border: 1px solid #e5252a;
+  border-radius: 8px;
+
+  background: white;
+  color: #e5252a;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.location-button:hover {
+  background: #fff0f0;
+}
+
+.location-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* ============================================================
+   WARNING
+============================================================ */
+
+.emergency-warning {
+  display: flex;
+  gap: 10px;
+
+  margin: 20px 25px;
+
+  padding: 13px;
+
+  border-radius: 9px;
+
+  background: #fff8e8;
+  border: 1px solid #f2dfb4;
+}
+
+.emergency-warning span {
+  font-size: 17px;
+}
+
+.emergency-warning p {
+  margin: 0;
+
+  color: #765c23;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+
+/* ============================================================
+   SUBMIT
+============================================================ */
+
+.submit-emergency-button {
+  width: calc(100% - 50px);
+
+  margin: 0 25px 25px;
+
+  padding: 14px;
+
+  border: none;
+  border-radius: 9px;
+
+  background: #e5252a;
+  color: white;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.submit-emergency-button:hover {
+  background: #c91e23;
+}
+
+.submit-emergency-button:disabled {
+  background: #ef6b6f;
+  cursor: not-allowed;
+}
+
+
+/* ============================================================
+   FOOTER
+============================================================ */
+
+.citizen-footer {
+  padding: 20px;
+
+  text-align: center;
+
+  color: #aaa;
+  font-size: 11px;
+
+  border-top: 1px solid #e8e8e8;
+}
+
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+
+@media (max-width: 750px) {
+  .citizen-header {
+    padding: 0 18px;
+  }
+
+  .citizen-user {
+    display: none;
+  }
+
+  .citizen-main {
+    width: calc(100% - 28px);
+    padding-top: 25px;
+  }
+
+  .citizen-welcome {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .report-emergency-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ambulance-main {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-item + .tracking-item {
+    border-left: none;
+    border-top: 1px solid #eeeeee;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .location-box {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .location-button {
+    width: 100%;
+  }
+}

@@ -22,6 +22,8 @@ from backend.services.hospital_assignment import find_nearest_hospital
 from backend.routers.ambulance import ambulance_response
 from backend.routers.hospital import hospital_response
 
+from backend.utils.distance import haversine_distance
+
 
 router = APIRouter()
 
@@ -30,18 +32,107 @@ router = APIRouter()
 # EMERGENCY RESPONSE FORMAT
 # ==========================================
 
-def emergency_response(emergency):
+def emergency_response(emergency, db):
+    """
+    Prepare complete emergency response.
+
+    Includes:
+    - Emergency details
+    - Assigned ambulance details
+    - Ambulance distance from emergency
+    - Estimated ambulance arrival time
+    """
+
+    ambulance_data = None
+
+    # ==========================================
+    # GET ASSIGNED AMBULANCE
+    # ==========================================
+
+    if emergency.ambulance_id is not None:
+
+        ambulance = (
+            db.query(Ambulance)
+            .filter(
+                Ambulance.id == emergency.ambulance_id
+            )
+            .first()
+        )
+
+        if ambulance:
+
+            # ==========================================
+            # CALCULATE DISTANCE
+            # ==========================================
+
+            distance = haversine_distance(
+                emergency.latitude,
+                emergency.longitude,
+                ambulance.latitude,
+                ambulance.longitude
+            )
+
+            # ==========================================
+            # ESTIMATE ARRIVAL TIME
+            #
+            # Assumed average ambulance speed = 40 km/h
+            # ==========================================
+
+            estimated_minutes = round(
+                (distance / 40) * 60
+            )
+
+            # Minimum 1 minute for any non-zero distance
+
+            if distance > 0 and estimated_minutes < 1:
+                estimated_minutes = 1
+
+            # ==========================================
+            # AMBULANCE RESPONSE
+            # ==========================================
+
+            ambulance_data = {
+                "id": ambulance.id,
+                "vehicle": ambulance.vehicle,
+                "status": ambulance.status,
+                "location": ambulance.location,
+
+                "latitude": ambulance.latitude,
+                "longitude": ambulance.longitude,
+
+                "distance_km": round(distance, 2),
+
+                "estimated_arrival_minutes": estimated_minutes
+            }
+
+    # ==========================================
+    # COMPLETE EMERGENCY RESPONSE
+    # ==========================================
+
     return {
         "id": emergency.id,
+
         "patient_name": emergency.patient_name,
         "phone": emergency.phone,
+
         "emergency_type": emergency.emergency_type,
+
         "location": emergency.location,
+
+        "latitude": emergency.latitude,
+        "longitude": emergency.longitude,
+
         "status": emergency.status,
         "severity": emergency.severity,
+
         "user_id": emergency.user_id,
+
         "ambulance_id": emergency.ambulance_id,
+
+        "ambulance": ambulance_data,
+
         "hospital_id": emergency.hospital_id,
+
         "created_at": emergency.created_at
     }
 
@@ -61,8 +152,12 @@ def get_emergencies(
 
     return {
         "logged_in_as": current_user.email,
+
         "emergencies": [
-            emergency_response(emergency)
+            emergency_response(
+                emergency,
+                db
+            )
             for emergency in emergencies
         ]
     }
@@ -137,6 +232,7 @@ def create_emergency(
         else:
 
             # Do not partially reserve resources
+
             assigned_ambulance = None
             assigned_hospital = None
 
@@ -145,15 +241,21 @@ def create_emergency(
         # ==========================================
 
         new_emergency = Emergency(
+
             patient_name=emergency.patient_name,
+
             phone=emergency.phone,
+
             emergency_type=emergency.emergency_type,
+
             location=emergency.location,
 
             latitude=emergency.latitude,
+
             longitude=emergency.longitude,
 
             severity=severity,
+
             status=emergency_status,
 
             user_id=current_user.id,
@@ -174,7 +276,7 @@ def create_emergency(
         db.add(new_emergency)
 
         # ==========================================
-        # 7. SINGLE DATABASE COMMIT
+        # 7. DATABASE COMMIT
         # ==========================================
 
         db.commit()
@@ -186,21 +288,29 @@ def create_emergency(
         # ==========================================
 
         return {
+
             "message": "Emergency created successfully",
 
             "ambulance": (
-                ambulance_response(assigned_ambulance)
+                ambulance_response(
+                    assigned_ambulance
+                )
                 if assigned_ambulance
                 else None
             ),
 
             "hospital": (
-                hospital_response(assigned_hospital)
+                hospital_response(
+                    assigned_hospital
+                )
                 if assigned_hospital
                 else None
             ),
 
-            "data": emergency_response(new_emergency)
+            "data": emergency_response(
+                new_emergency,
+                db
+            )
         }
 
     except Exception as error:
@@ -228,31 +338,50 @@ def get_emergency(
     current_user: User = Depends(get_current_user)
 ):
 
+    # ==========================================
+    # FIND EMERGENCY
+    # ==========================================
+
     emergency = (
         db.query(Emergency)
-        .filter(Emergency.id == emergency_id)
+        .filter(
+            Emergency.id == emergency_id
+        )
         .first()
     )
 
     if not emergency:
+
         raise HTTPException(
             status_code=404,
             detail="Emergency not found"
         )
 
+    # ==========================================
+    # ACCESS CONTROL
+    #
     # Admin can view every emergency.
     # Other users can only view their own emergency.
+    # ==========================================
 
     if (
         current_user.role != "Admin"
         and emergency.user_id != current_user.id
     ):
+
         raise HTTPException(
             status_code=403,
             detail="Access denied"
         )
 
-    return emergency_response(emergency)
+    # ==========================================
+    # RETURN COMPLETE EMERGENCY
+    # ==========================================
+
+    return emergency_response(
+        emergency,
+        db
+    )
 
 
 # ==========================================
@@ -268,13 +397,20 @@ def update_emergency(
     current_user: User = Depends(require_role("Admin"))
 ):
 
+    # ==========================================
+    # FIND EMERGENCY
+    # ==========================================
+
     db_emergency = (
         db.query(Emergency)
-        .filter(Emergency.id == emergency_id)
+        .filter(
+            Emergency.id == emergency_id
+        )
         .first()
     )
 
     if not db_emergency:
+
         raise HTTPException(
             status_code=404,
             detail="Emergency not found"
@@ -285,6 +421,7 @@ def update_emergency(
     # ==========================================
 
     if emergency.status is not None:
+
         db_emergency.status = emergency.status
 
     # ==========================================
@@ -292,21 +429,37 @@ def update_emergency(
     # ==========================================
 
     if emergency.ambulance_id is not None:
-        db_emergency.ambulance_id = emergency.ambulance_id
+
+        db_emergency.ambulance_id = (
+            emergency.ambulance_id
+        )
 
     # ==========================================
     # UPDATE HOSPITAL
     # ==========================================
 
     if emergency.hospital_id is not None:
-        db_emergency.hospital_id = emergency.hospital_id
+
+        db_emergency.hospital_id = (
+            emergency.hospital_id
+        )
+
+    # ==========================================
+    # SAVE CHANGES
+    # ==========================================
 
     db.commit()
+
     db.refresh(db_emergency)
 
     return {
+
         "message": "Emergency updated successfully",
-        "data": emergency_response(db_emergency)
+
+        "data": emergency_response(
+            db_emergency,
+            db
+        )
     }
 
 
@@ -328,11 +481,14 @@ def delete_emergency(
 
     db_emergency = (
         db.query(Emergency)
-        .filter(Emergency.id == emergency_id)
+        .filter(
+            Emergency.id == emergency_id
+        )
         .first()
     )
 
     if not db_emergency:
+
         raise HTTPException(
             status_code=404,
             detail="Emergency not found"
@@ -347,12 +503,14 @@ def delete_emergency(
         ambulance = (
             db.query(Ambulance)
             .filter(
-                Ambulance.id == db_emergency.ambulance_id
+                Ambulance.id
+                == db_emergency.ambulance_id
             )
             .first()
         )
 
         if ambulance:
+
             ambulance.status = "Available"
 
     # ==========================================
@@ -364,12 +522,14 @@ def delete_emergency(
         hospital = (
             db.query(Hospital)
             .filter(
-                Hospital.id == db_emergency.hospital_id
+                Hospital.id
+                == db_emergency.hospital_id
             )
             .first()
         )
 
         if hospital:
+
             hospital.available_beds += 1
 
     # ==========================================
@@ -407,11 +567,14 @@ def complete_emergency(
 
     emergency = (
         db.query(Emergency)
-        .filter(Emergency.id == emergency_id)
+        .filter(
+            Emergency.id == emergency_id
+        )
         .first()
     )
 
     if not emergency:
+
         raise HTTPException(
             status_code=404,
             detail="Emergency not found"
@@ -422,6 +585,7 @@ def complete_emergency(
     # ==========================================
 
     if emergency.status == "Completed":
+
         raise HTTPException(
             status_code=400,
             detail="Emergency already completed"
@@ -442,12 +606,14 @@ def complete_emergency(
         ambulance = (
             db.query(Ambulance)
             .filter(
-                Ambulance.id == emergency.ambulance_id
+                Ambulance.id
+                == emergency.ambulance_id
             )
             .first()
         )
 
         if ambulance:
+
             ambulance.status = "Available"
 
     # ==========================================
@@ -459,12 +625,14 @@ def complete_emergency(
         hospital = (
             db.query(Hospital)
             .filter(
-                Hospital.id == emergency.hospital_id
+                Hospital.id
+                == emergency.hospital_id
             )
             .first()
         )
 
         if hospital:
+
             hospital.available_beds += 1
 
     # ==========================================
@@ -476,6 +644,11 @@ def complete_emergency(
     db.refresh(emergency)
 
     return {
+
         "message": "Emergency completed successfully",
-        "data": emergency_response(emergency)
+
+        "data": emergency_response(
+            emergency,
+            db
+        )
     }

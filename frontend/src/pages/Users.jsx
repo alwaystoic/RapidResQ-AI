@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import "./Users.css";
 
 const API_URL = "http://127.0.0.1:8000";
@@ -8,10 +8,7 @@ function Users() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ==========================================
-  // EDIT USER
-  // ==========================================
-
+  // Edit user
   const [editingUser, setEditingUser] = useState(null);
   const [editForm, setEditForm] = useState({
     full_name: "",
@@ -23,10 +20,7 @@ function Users() {
   });
   const [savingUser, setSavingUser] = useState(false);
 
-  // ==========================================
-  // ADD USER
-  // ==========================================
-
+  // Add user
   const [addingUser, setAddingUser] = useState(false);
   const [addForm, setAddForm] = useState({
     full_name: "",
@@ -38,37 +32,16 @@ function Users() {
   });
   const [creatingUser, setCreatingUser] = useState(false);
 
-  // ==========================================
-  // DELETE
-  // ==========================================
-
+  // Delete user
   const [deletingId, setDeletingId] = useState(null);
 
-  // ==========================================
-  // NAVIGATION
-  // ==========================================
-
-  const goToDashboard = () => {
-    window.location.assign("/dashboard");
-  };
-
-  // ==========================================
-  // TOKEN
-  // ==========================================
+  // =========================================================
+  // HELPERS
+  // =========================================================
 
   const getToken = () => {
-    const token = localStorage.getItem("access_token");
-
-    if (!token) {
-      throw new Error("You are not logged in.");
-    }
-
-    return token;
+    return localStorage.getItem("access_token");
   };
-
-  // ==========================================
-  // API RESPONSE ERROR
-  // ==========================================
 
   const getErrorMessage = (data, fallback) => {
     if (Array.isArray(data?.detail)) {
@@ -84,12 +57,24 @@ function Users() {
     return fallback;
   };
 
-  // ==========================================
-  // LOAD USERS
-  // ==========================================
+  // =========================================================
+  // NAVIGATION
+  // =========================================================
 
-  const fetchUsers = useCallback(async () => {
+  const goToDashboard = () => {
+    window.location.assign("/dashboard");
+  };
+
+  // =========================================================
+  // FETCH USERS
+  // =========================================================
+
+  const fetchUsers = async () => {
     const token = getToken();
+
+    if (!token) {
+      throw new Error("You are not logged in.");
+    }
 
     const response = await fetch(`${API_URL}/users`, {
       method: "GET",
@@ -107,11 +92,11 @@ function Users() {
     }
 
     return data.users || [];
-  }, []);
+  };
 
-  // ==========================================
+  // =========================================================
   // INITIAL LOAD
-  // ==========================================
+  // =========================================================
 
   useEffect(() => {
     let cancelled = false;
@@ -146,9 +131,9 @@ function Users() {
     };
   }, []);
 
-  // ==========================================
+  // =========================================================
   // REFRESH
-  // ==========================================
+  // =========================================================
 
   const refreshUsers = async () => {
     try {
@@ -156,158 +141,18 @@ function Users() {
       setLoading(true);
 
       const data = await fetchUsers();
-
       setUsers(data);
     } catch (err) {
       console.error("User refresh error:", err);
-
       setError(err.message || "Unable to refresh users.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ==========================================
-  // EDIT USER
-  // ==========================================
-
-  const openEditModal = (user) => {
-    setError("");
-
-    setEditingUser(user);
-
-    setEditForm({
-      full_name: user.full_name || "",
-      email: user.email || "",
-      phone: user.phone || "",
-      password: "",
-      role: user.role || "Citizen",
-      status: user.status || "Active",
-    });
-  };
-
-  const closeEditModal = () => {
-    if (savingUser) {
-      return;
-    }
-
-    setEditingUser(null);
-
-    setEditForm({
-      full_name: "",
-      email: "",
-      phone: "",
-      password: "",
-      role: "Citizen",
-      status: "Active",
-    });
-  };
-
-  const handleEditChange = (event) => {
-    const { name, value } = event.target;
-
-    setEditForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const updateUser = async (event) => {
-    event.preventDefault();
-
-    if (!editingUser) {
-      return;
-    }
-
-    try {
-      setSavingUser(true);
-      setError("");
-
-      const token = getToken();
-
-      if (!editForm.full_name.trim()) {
-        throw new Error("Full name is required.");
-      }
-
-      if (!editForm.email.trim()) {
-        throw new Error("Email is required.");
-      }
-
-      if (!editForm.phone.trim()) {
-        throw new Error("Phone number is required.");
-      }
-
-      if (!editForm.role.trim()) {
-        throw new Error("Role is required.");
-      }
-
-      if (!editForm.status.trim()) {
-        throw new Error("Status is required.");
-      }
-
-      const payload = {
-        full_name: editForm.full_name.trim(),
-        email: editForm.email.trim(),
-        phone: editForm.phone.trim(),
-        role: editForm.role,
-        status: editForm.status,
-      };
-
-      // Password is optional during update.
-      if (editForm.password.trim()) {
-        payload.password = editForm.password;
-      }
-
-      const response = await fetch(
-        `${API_URL}/users/${editingUser.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          getErrorMessage(data, "Failed to update user.")
-        );
-      }
-
-      if (data.data) {
-        setUsers((previousUsers) =>
-          previousUsers.map((user) =>
-            user.id === editingUser.id
-              ? data.data
-              : user
-          )
-        );
-      } else {
-        const updatedUsers = await fetchUsers();
-        setUsers(updatedUsers);
-      }
-
-      closeEditModal();
-
-      console.log("User updated successfully:", data);
-    } catch (err) {
-      console.error("User update error:", err);
-
-      setError(
-        err.message || "Unable to update user."
-      );
-    } finally {
-      setSavingUser(false);
-    }
-  };
-
-  // ==========================================
+  // =========================================================
   // ADD USER
-  // ==========================================
+  // =========================================================
 
   const openAddModal = () => {
     setError("");
@@ -325,9 +170,7 @@ function Users() {
   };
 
   const closeAddModal = () => {
-    if (creatingUser) {
-      return;
-    }
+    if (creatingUser) return;
 
     setAddingUser(false);
 
@@ -358,6 +201,10 @@ function Users() {
       setError("");
 
       const token = getToken();
+
+      if (!token) {
+        throw new Error("You are not logged in.");
+      }
 
       if (!addForm.full_name.trim()) {
         throw new Error("Full name is required.");
@@ -414,33 +261,166 @@ function Users() {
       console.log("User created successfully:", data);
     } catch (err) {
       console.error("User create error:", err);
-
-      setError(
-        err.message || "Unable to create user."
-      );
+      setError(err.message || "Unable to create user.");
     } finally {
       setCreatingUser(false);
     }
   };
 
-  // ==========================================
+  // =========================================================
+  // EDIT USER
+  // =========================================================
+
+  const openEditModal = (user) => {
+    setError("");
+    setEditingUser(user);
+
+    setEditForm({
+      full_name: user.full_name || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      password: "",
+      role: user.role || "Citizen",
+      status: user.status || "Active",
+    });
+  };
+
+  const closeEditModal = () => {
+    if (savingUser) return;
+
+    setEditingUser(null);
+
+    setEditForm({
+      full_name: "",
+      email: "",
+      phone: "",
+      password: "",
+      role: "Citizen",
+      status: "Active",
+    });
+  };
+
+  const handleEditChange = (event) => {
+    const { name, value } = event.target;
+
+    setEditForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const updateUser = async (event) => {
+    event.preventDefault();
+
+    if (!editingUser) return;
+
+    try {
+      setSavingUser(true);
+      setError("");
+
+      const token = getToken();
+
+      if (!token) {
+        throw new Error("You are not logged in.");
+      }
+
+      if (!editForm.full_name.trim()) {
+        throw new Error("Full name is required.");
+      }
+
+      if (!editForm.email.trim()) {
+        throw new Error("Email is required.");
+      }
+
+      if (!editForm.phone.trim()) {
+        throw new Error("Phone number is required.");
+      }
+
+      if (!editForm.role.trim()) {
+        throw new Error("Role is required.");
+      }
+
+      if (!editForm.status.trim()) {
+        throw new Error("Status is required.");
+      }
+
+      if (!editForm.password.trim()) {
+        throw new Error(
+          "Please enter a new password when updating the user."
+        );
+      }
+
+      const response = await fetch(
+        `${API_URL}/users/${editingUser.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            full_name: editForm.full_name.trim(),
+            email: editForm.email.trim(),
+            phone: editForm.phone.trim(),
+            password: editForm.password,
+            role: editForm.role,
+            status: editForm.status,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          getErrorMessage(data, "Failed to update user.")
+        );
+      }
+
+      if (data.data) {
+        setUsers((previousUsers) =>
+          previousUsers.map((user) =>
+            user.id === editingUser.id
+              ? data.data
+              : user
+          )
+        );
+      } else {
+        const updatedUsers = await fetchUsers();
+        setUsers(updatedUsers);
+      }
+
+      closeEditModal();
+
+      console.log("User updated successfully:", data);
+    } catch (err) {
+      console.error("User update error:", err);
+      setError(err.message || "Unable to update user.");
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  // =========================================================
   // DELETE USER
-  // ==========================================
+  // =========================================================
 
   const deleteUser = async (user) => {
     const confirmed = window.confirm(
       `Are you sure you want to delete "${user.full_name}"?\n\nThis action cannot be undone.`
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       setDeletingId(user.id);
       setError("");
 
       const token = getToken();
+
+      if (!token) {
+        throw new Error("You are not logged in.");
+      }
 
       const response = await fetch(
         `${API_URL}/users/${user.id}`,
@@ -470,18 +450,15 @@ function Users() {
       console.log("User deleted successfully:", data);
     } catch (err) {
       console.error("User delete error:", err);
-
-      setError(
-        err.message || "Unable to delete user."
-      );
+      setError(err.message || "Unable to delete user.");
     } finally {
       setDeletingId(null);
     }
   };
 
-  // ==========================================
+  // =========================================================
   // STATISTICS
-  // ==========================================
+  // =========================================================
 
   const totalUsers = users.length;
 
@@ -505,9 +482,9 @@ function Users() {
       user.role?.toLowerCase() !== "admin"
   ).length;
 
-  // ==========================================
+  // =========================================================
   // ROLE CLASS
-  // ==========================================
+  // =========================================================
 
   const getRoleClass = (role) => {
     switch (role?.toLowerCase()) {
@@ -528,9 +505,9 @@ function Users() {
     }
   };
 
-  // ==========================================
+  // =========================================================
   // STATUS CLASS
-  // ==========================================
+  // =========================================================
 
   const getStatusClass = (status) => {
     switch (status?.toLowerCase()) {
@@ -545,9 +522,9 @@ function Users() {
     }
   };
 
-  // ==========================================
+  // =========================================================
   // LOADING
-  // ==========================================
+  // =========================================================
 
   if (loading) {
     return (
@@ -567,17 +544,14 @@ function Users() {
     );
   }
 
-  // ==========================================
+  // =========================================================
   // PAGE
-  // ==========================================
+  // =========================================================
 
   return (
     <main className="users-main">
 
-      {/* ======================================
-          HEADER
-      ====================================== */}
-
+      {/* HEADER */}
       <header className="users-header">
 
         <div className="users-header-left">
@@ -620,26 +594,18 @@ function Users() {
 
       </header>
 
-      {/* ======================================
-          ERROR
-      ====================================== */}
-
+      {/* ERROR */}
       {error && (
         <div className="users-error">
-          {error}
+          <strong>Error:</strong> {error}
         </div>
       )}
 
-      {/* ======================================
-          STATISTICS
-      ====================================== */}
-
+      {/* STATISTICS */}
       <section className="users-stats">
 
         <div className="user-stat-card total">
-          <div className="stat-icon">
-            👥
-          </div>
+          <div className="stat-icon">👥</div>
 
           <div>
             <span>Total Users</span>
@@ -649,9 +615,7 @@ function Users() {
         </div>
 
         <div className="user-stat-card active">
-          <div className="stat-icon">
-            ✓
-          </div>
+          <div className="stat-icon">✓</div>
 
           <div>
             <span>Active</span>
@@ -661,9 +625,7 @@ function Users() {
         </div>
 
         <div className="user-stat-card inactive">
-          <div className="stat-icon">
-            ⏸
-          </div>
+          <div className="stat-icon">!</div>
 
           <div>
             <span>Inactive</span>
@@ -673,9 +635,7 @@ function Users() {
         </div>
 
         <div className="user-stat-card admins">
-          <div className="stat-icon">
-            🛡
-          </div>
+          <div className="stat-icon">🛡</div>
 
           <div>
             <span>Admins</span>
@@ -685,9 +645,7 @@ function Users() {
         </div>
 
         <div className="user-stat-card staff">
-          <div className="stat-icon">
-            👤
-          </div>
+          <div className="stat-icon">👤</div>
 
           <div>
             <span>Staff / Citizens</span>
@@ -698,10 +656,7 @@ function Users() {
 
       </section>
 
-      {/* ======================================
-          USER TABLE
-      ====================================== */}
-
+      {/* USER TABLE */}
       <section className="users-table-card">
 
         <div className="users-table-header">
@@ -776,15 +731,13 @@ function Users() {
                         </div>
 
                         <div>
-
                           <strong>
-                            {user.full_name}
+                            {user.full_name || "N/A"}
                           </strong>
 
                           <small>
                             User ID: {user.id}
                           </small>
-
                         </div>
 
                       </div>
@@ -792,32 +745,39 @@ function Users() {
                     </td>
 
                     <td>
-                      {user.email}
+                      {user.email || "N/A"}
                     </td>
 
                     <td>
-                      {user.phone}
+                      {user.phone || "N/A"}
                     </td>
 
                     <td>
+
                       <span
                         className={getRoleClass(
                           user.role
                         )}
                       >
-                        {user.role}
+                        {user.role || "Unknown"}
                       </span>
+
                     </td>
 
                     <td>
+
                       <span
                         className={getStatusClass(
                           user.status
                         )}
                       >
-                        <span className="status-dot" />
-                        {user.status}
+
+                        <span className="status-dot"></span>
+
+                        {user.status || "Unknown"}
+
                       </span>
+
                     </td>
 
                     <td>
@@ -830,6 +790,9 @@ function Users() {
                           onClick={() =>
                             openEditModal(user)
                           }
+                          disabled={
+                            deletingId === user.id
+                          }
                         >
                           Edit
                         </button>
@@ -837,11 +800,11 @@ function Users() {
                         <button
                           type="button"
                           className="delete-user-button"
-                          disabled={
-                            deletingId === user.id
-                          }
                           onClick={() =>
                             deleteUser(user)
+                          }
+                          disabled={
+                            deletingId === user.id
                           }
                         >
                           {deletingId === user.id
@@ -867,39 +830,39 @@ function Users() {
 
       </section>
 
-      {/* ======================================
+      {/* =====================================================
           ADD USER MODAL
-      ====================================== */}
+      ===================================================== */}
 
       {addingUser && (
 
         <div
-          style={modalOverlayStyle}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeAddModal();
-            }
-          }}
+          className="modal-overlay"
+          onClick={closeAddModal}
         >
 
-          <div style={modalStyle}>
+          <div
+            className="user-modal"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
 
-            <div style={modalHeaderStyle}>
+            <div className="modal-header">
 
               <div>
-                <h2 style={modalTitleStyle}>
-                  Add User
-                </h2>
+                <h2>Add User</h2>
 
-                <p style={modalSubtitleStyle}>
-                  Create a new RapidResQ user
+                <p>
+                  Create a new RapidResQ user account
                 </p>
               </div>
 
               <button
                 type="button"
+                className="modal-close"
                 onClick={closeAddModal}
-                style={closeButtonStyle}
+                disabled={creatingUser}
               >
                 ×
               </button>
@@ -908,74 +871,128 @@ function Users() {
 
             <form onSubmit={createUser}>
 
-              <div style={formGridStyle}>
+              <div className="form-group">
+                <label htmlFor="add-full-name">
+                  Full Name
+                </label>
 
-                <FormField
-                  label="Full Name"
+                <input
+                  id="add-full-name"
+                  type="text"
                   name="full_name"
                   value={addForm.full_name}
                   onChange={handleAddChange}
+                  required
                   placeholder="Enter full name"
                 />
+              </div>
 
-                <FormField
-                  label="Email"
-                  name="email"
+              <div className="form-group">
+                <label htmlFor="add-email">
+                  Email
+                </label>
+
+                <input
+                  id="add-email"
                   type="email"
+                  name="email"
                   value={addForm.email}
                   onChange={handleAddChange}
-                  placeholder="Enter email"
+                  required
+                  placeholder="Enter email address"
                 />
+              </div>
 
-                <FormField
-                  label="Phone"
+              <div className="form-group">
+                <label htmlFor="add-phone">
+                  Phone
+                </label>
+
+                <input
+                  id="add-phone"
+                  type="text"
                   name="phone"
                   value={addForm.phone}
                   onChange={handleAddChange}
+                  required
                   placeholder="Enter phone number"
                 />
+              </div>
 
-                <FormField
-                  label="Password"
-                  name="password"
-                  type="password"
-                  value={addForm.password}
-                  onChange={handleAddChange}
-                  placeholder="Enter password"
-                />
+              <div className="form-group">
+                <label htmlFor="add-role">
+                  Role
+                </label>
 
-                <SelectField
-                  label="Role"
+                <select
+                  id="add-role"
                   name="role"
                   value={addForm.role}
                   onChange={handleAddChange}
-                  options={[
-                    "Citizen",
-                    "Dispatcher",
-                    "Hospital",
-                    "Admin",
-                  ]}
-                />
+                  required
+                >
+                  <option value="Admin">
+                    Admin
+                  </option>
 
-                <SelectField
-                  label="Status"
+                  <option value="Citizen">
+                    Citizen
+                  </option>
+
+                  <option value="Dispatcher">
+                    Dispatcher
+                  </option>
+
+                  <option value="Hospital">
+                    Hospital
+                  </option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="add-status">
+                  Status
+                </label>
+
+                <select
+                  id="add-status"
                   name="status"
                   value={addForm.status}
                   onChange={handleAddChange}
-                  options={[
-                    "Active",
-                    "Inactive",
-                  ]}
-                />
+                  required
+                >
+                  <option value="Active">
+                    Active
+                  </option>
 
+                  <option value="Inactive">
+                    Inactive
+                  </option>
+                </select>
               </div>
 
-              <div style={modalActionsStyle}>
+              <div className="form-group">
+                <label htmlFor="add-password">
+                  Password
+                </label>
+
+                <input
+                  id="add-password"
+                  type="password"
+                  name="password"
+                  value={addForm.password}
+                  onChange={handleAddChange}
+                  required
+                  placeholder="Enter password"
+                />
+              </div>
+
+              <div className="modal-actions">
 
                 <button
                   type="button"
+                  className="cancel-button"
                   onClick={closeAddModal}
-                  style={cancelButtonStyle}
                   disabled={creatingUser}
                 >
                   Cancel
@@ -983,7 +1000,7 @@ function Users() {
 
                 <button
                   type="submit"
-                  style={saveButtonStyle}
+                  className="save-button"
                   disabled={creatingUser}
                 >
                   {creatingUser
@@ -1001,39 +1018,38 @@ function Users() {
 
       )}
 
-      {/* ======================================
+      {/* =====================================================
           EDIT USER MODAL
-      ====================================== */}
+      ===================================================== */}
 
       {editingUser && (
 
         <div
-          style={modalOverlayStyle}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeEditModal();
-            }
-          }}
+          className="modal-overlay"
+          onClick={closeEditModal}
         >
 
-          <div style={modalStyle}>
+          <div
+            className="user-modal"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
 
-            <div style={modalHeaderStyle}>
+            <div className="modal-header">
 
               <div>
-                <h2 style={modalTitleStyle}>
-                  Edit User
-                </h2>
+                <h2>Edit User</h2>
 
-                <p style={modalSubtitleStyle}>
-                  Update user information
+                <p>
+                  Update user account details
                 </p>
               </div>
 
               <button
                 type="button"
+                className="modal-close"
                 onClick={closeEditModal}
-                style={closeButtonStyle}
                 disabled={savingUser}
               >
                 ×
@@ -1043,88 +1059,130 @@ function Users() {
 
             <form onSubmit={updateUser}>
 
-              <div style={formGridStyle}>
+              <div className="form-group">
+                <label htmlFor="edit-full-name">
+                  Full Name
+                </label>
 
-                <FormField
-                  label="Full Name"
+                <input
+                  id="edit-full-name"
+                  type="text"
                   name="full_name"
                   value={editForm.full_name}
                   onChange={handleEditChange}
-                  placeholder="Enter full name"
+                  required
                 />
+              </div>
 
-                <FormField
-                  label="Email"
-                  name="email"
+              <div className="form-group">
+                <label htmlFor="edit-email">
+                  Email
+                </label>
+
+                <input
+                  id="edit-email"
                   type="email"
+                  name="email"
                   value={editForm.email}
                   onChange={handleEditChange}
-                  placeholder="Enter email"
+                  required
                 />
+              </div>
 
-                <FormField
-                  label="Phone"
+              <div className="form-group">
+                <label htmlFor="edit-phone">
+                  Phone
+                </label>
+
+                <input
+                  id="edit-phone"
+                  type="text"
                   name="phone"
                   value={editForm.phone}
                   onChange={handleEditChange}
-                  placeholder="Enter phone number"
+                  required
                 />
+              </div>
 
-                <FormField
-                  label="New Password"
-                  name="password"
-                  type="password"
-                  value={editForm.password}
-                  onChange={handleEditChange}
-                  placeholder="Leave blank to keep current password"
-                />
+              <div className="form-group">
+                <label htmlFor="edit-role">
+                  Role
+                </label>
 
-                <SelectField
-                  label="Role"
+                <select
+                  id="edit-role"
                   name="role"
                   value={editForm.role}
                   onChange={handleEditChange}
-                  options={[
-                    "Citizen",
-                    "Dispatcher",
-                    "Hospital",
-                    "Admin",
-                  ]}
-                />
+                  required
+                >
+                  <option value="Admin">
+                    Admin
+                  </option>
 
-                <SelectField
-                  label="Status"
+                  <option value="Citizen">
+                    Citizen
+                  </option>
+
+                  <option value="Dispatcher">
+                    Dispatcher
+                  </option>
+
+                  <option value="Hospital">
+                    Hospital
+                  </option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-status">
+                  Status
+                </label>
+
+                <select
+                  id="edit-status"
                   name="status"
                   value={editForm.status}
                   onChange={handleEditChange}
-                  options={[
-                    "Active",
-                    "Inactive",
-                  ]}
+                  required
+                >
+                  <option value="Active">
+                    Active
+                  </option>
+
+                  <option value="Inactive">
+                    Inactive
+                  </option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-password">
+                  New Password
+                </label>
+
+                <input
+                  id="edit-password"
+                  type="password"
+                  name="password"
+                  value={editForm.password}
+                  onChange={handleEditChange}
+                  required
+                  placeholder="Enter new password"
                 />
 
+                <small className="form-help">
+                  Enter a new password when updating
+                  the user.
+                </small>
               </div>
 
-              <div
-                style={{
-                  marginTop: "8px",
-                  padding: "10px 12px",
-                  borderRadius: "7px",
-                  background: "#f9fafb",
-                  color: "#6b7280",
-                  fontSize: "11px",
-                }}
-              >
-                Leave the password field blank if you do not
-                want to change the user's password.
-              </div>
-
-              <div style={modalActionsStyle}>
+              <div className="modal-actions">
 
                 <button
                   type="button"
+                  className="cancel-button"
                   onClick={closeEditModal}
-                  style={cancelButtonStyle}
                   disabled={savingUser}
                 >
                   Cancel
@@ -1132,7 +1190,7 @@ function Users() {
 
                 <button
                   type="submit"
-                  style={saveButtonStyle}
+                  className="save-button"
                   disabled={savingUser}
                 >
                   {savingUser
@@ -1153,193 +1211,5 @@ function Users() {
     </main>
   );
 }
-
-// ==========================================
-// FORM COMPONENTS
-// ==========================================
-
-function FormField({
-  label,
-  name,
-  type = "text",
-  value,
-  onChange,
-  placeholder,
-}) {
-  return (
-    <label style={fieldStyle}>
-
-      <span style={fieldLabelStyle}>
-        {label}
-      </span>
-
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        style={inputStyle}
-      />
-
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  name,
-  value,
-  onChange,
-  options,
-}) {
-  return (
-    <label style={fieldStyle}>
-
-      <span style={fieldLabelStyle}>
-        {label}
-      </span>
-
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        style={inputStyle}
-      >
-        {options.map((option) => (
-          <option
-            key={option}
-            value={option}
-          >
-            {option}
-          </option>
-        ))}
-      </select>
-
-    </label>
-  );
-}
-
-// ==========================================
-// MODAL STYLES
-// ==========================================
-
-const modalOverlayStyle = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 1000,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "20px",
-  background: "rgba(17, 24, 39, 0.45)",
-};
-
-const modalStyle = {
-  width: "100%",
-  maxWidth: "620px",
-  maxHeight: "90vh",
-  overflowY: "auto",
-  padding: "24px",
-  borderRadius: "12px",
-  background: "#ffffff",
-  boxShadow: "0 20px 50px rgba(0, 0, 0, 0.18)",
-};
-
-const modalHeaderStyle = {
-  display: "flex",
-  alignItems: "flex-start",
-  justifyContent: "space-between",
-  gap: "20px",
-  marginBottom: "22px",
-};
-
-const modalTitleStyle = {
-  margin: 0,
-  color: "#111827",
-  fontSize: "20px",
-  fontWeight: 700,
-};
-
-const modalSubtitleStyle = {
-  margin: "5px 0 0",
-  color: "#6b7280",
-  fontSize: "12px",
-};
-
-const closeButtonStyle = {
-  width: "32px",
-  height: "32px",
-  border: "1px solid #e5e7eb",
-  borderRadius: "7px",
-  background: "#ffffff",
-  color: "#6b7280",
-  fontSize: "20px",
-  lineHeight: 1,
-  cursor: "pointer",
-};
-
-const formGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "16px",
-};
-
-const fieldStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "6px",
-};
-
-const fieldLabelStyle = {
-  color: "#374151",
-  fontSize: "12px",
-  fontWeight: 600,
-};
-
-const inputStyle = {
-  width: "100%",
-  height: "40px",
-  padding: "0 11px",
-  border: "1px solid #d1d5db",
-  borderRadius: "7px",
-  outline: "none",
-  background: "#ffffff",
-  color: "#111827",
-  fontSize: "12px",
-};
-
-const modalActionsStyle = {
-  display: "flex",
-  justifyContent: "flex-end",
-  gap: "10px",
-  marginTop: "24px",
-  paddingTop: "18px",
-  borderTop: "1px solid #eeeeee",
-};
-
-const cancelButtonStyle = {
-  height: "38px",
-  padding: "0 16px",
-  border: "1px solid #e5e7eb",
-  borderRadius: "7px",
-  background: "#ffffff",
-  color: "#374151",
-  fontSize: "12px",
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const saveButtonStyle = {
-  height: "38px",
-  padding: "0 18px",
-  border: "1px solid #ef2929",
-  borderRadius: "7px",
-  background: "#ef2929",
-  color: "#ffffff",
-  fontSize: "12px",
-  fontWeight: 600,
-  cursor: "pointer",
-};
 
 export default Users;
