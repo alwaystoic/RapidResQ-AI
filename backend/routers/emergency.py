@@ -253,11 +253,16 @@ def create_emergency(
             assigned_ambulance.status = "Busy"
 
             if assigned_hospital.available_beds > 0:
+
                 assigned_hospital.available_beds -= 1
+
             else:
+
                 assigned_ambulance.status = "Available"
+
                 assigned_ambulance = None
                 assigned_hospital = None
+
                 emergency_status = "Pending"
 
         else:
@@ -317,6 +322,7 @@ def create_emergency(
         # ====================================================
 
         return {
+
             "message": "Emergency created successfully",
 
             "ambulance": (
@@ -400,6 +406,13 @@ def get_emergency(
 # ============================================================
 # UPDATE EMERGENCY
 # ADMIN ONLY
+#
+# Supports:
+# - Status update
+# - Ambulance reassignment
+# - Hospital reassignment
+# - Automatic resource release
+# - Automatic resource reservation
 # ============================================================
 
 @router.put("/emergencies/{emergency_id}")
@@ -409,6 +422,10 @@ def update_emergency(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("Admin"))
 ):
+
+    # ========================================================
+    # FIND EMERGENCY
+    # ========================================================
 
     db_emergency = (
         db.query(Emergency)
@@ -426,38 +443,242 @@ def update_emergency(
         )
 
     # ========================================================
+    # COMPLETED EMERGENCIES CANNOT BE MODIFIED
+    # ========================================================
+
+    if db_emergency.status == "Completed":
+
+        raise HTTPException(
+            status_code=400,
+            detail="Completed emergency cannot be modified"
+        )
+
+    # ========================================================
     # UPDATE STATUS
     # ========================================================
 
     if emergency.status is not None:
 
+        allowed_statuses = {
+            "Pending",
+            "Assigned",
+            "Completed"
+        }
+
+        if emergency.status not in allowed_statuses:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid status. Allowed values: "
+                    "Pending, Assigned, Completed"
+                )
+            )
+
         db_emergency.status = emergency.status
 
     # ========================================================
-    # UPDATE AMBULANCE
+    # AMBULANCE REASSIGNMENT
     # ========================================================
 
     if emergency.ambulance_id is not None:
 
-        db_emergency.ambulance_id = (
-            emergency.ambulance_id
-        )
+        # ----------------------------------------------------
+        # If the same ambulance is already assigned,
+        # there is nothing to change.
+        # ----------------------------------------------------
+
+        if emergency.ambulance_id != db_emergency.ambulance_id:
+
+            # ------------------------------------------------
+            # FIND NEW AMBULANCE
+            # ------------------------------------------------
+
+            new_ambulance = (
+                db.query(Ambulance)
+                .filter(
+                    Ambulance.id ==
+                    emergency.ambulance_id
+                )
+                .first()
+            )
+
+            if not new_ambulance:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="Selected ambulance not found"
+                )
+
+            # ------------------------------------------------
+            # CHECK AVAILABILITY
+            # ------------------------------------------------
+
+            if new_ambulance.status != "Available":
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Selected ambulance is not available"
+                )
+
+            # ------------------------------------------------
+            # RELEASE OLD AMBULANCE
+            # ------------------------------------------------
+
+            if db_emergency.ambulance_id is not None:
+
+                old_ambulance = (
+                    db.query(Ambulance)
+                    .filter(
+                        Ambulance.id ==
+                        db_emergency.ambulance_id
+                    )
+                    .first()
+                )
+
+                if old_ambulance:
+
+                    old_ambulance.status = "Available"
+
+            # ------------------------------------------------
+            # RESERVE NEW AMBULANCE
+            # ------------------------------------------------
+
+            new_ambulance.status = "Busy"
+
+            # ------------------------------------------------
+            # UPDATE EMERGENCY
+            # ------------------------------------------------
+
+            db_emergency.ambulance_id = new_ambulance.id
 
     # ========================================================
-    # UPDATE HOSPITAL
+    # HOSPITAL REASSIGNMENT
     # ========================================================
 
     if emergency.hospital_id is not None:
 
-        db_emergency.hospital_id = (
-            emergency.hospital_id
+        # ----------------------------------------------------
+        # If the same hospital is already assigned,
+        # there is nothing to change.
+        # ----------------------------------------------------
+
+        if emergency.hospital_id != db_emergency.hospital_id:
+
+            # ------------------------------------------------
+            # FIND NEW HOSPITAL
+            # ------------------------------------------------
+
+            new_hospital = (
+                db.query(Hospital)
+                .filter(
+                    Hospital.id ==
+                    emergency.hospital_id
+                )
+                .first()
+            )
+
+            if not new_hospital:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="Selected hospital not found"
+                )
+
+            # ------------------------------------------------
+            # CHECK HOSPITAL STATUS
+            # ------------------------------------------------
+
+            if new_hospital.status != "Available":
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Selected hospital is not available"
+                )
+
+            # ------------------------------------------------
+            # CHECK BED AVAILABILITY
+            # ------------------------------------------------
+
+            if new_hospital.available_beds <= 0:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="Selected hospital has no available beds"
+                )
+
+            # ------------------------------------------------
+            # RELEASE OLD HOSPITAL BED
+            # ------------------------------------------------
+
+            if db_emergency.hospital_id is not None:
+
+                old_hospital = (
+                    db.query(Hospital)
+                    .filter(
+                        Hospital.id ==
+                        db_emergency.hospital_id
+                    )
+                    .first()
+                )
+
+                if old_hospital:
+
+                    old_hospital.available_beds += 1
+
+            # ------------------------------------------------
+            # RESERVE NEW HOSPITAL BED
+            # ------------------------------------------------
+
+            new_hospital.available_beds -= 1
+
+            # ------------------------------------------------
+            # UPDATE EMERGENCY
+            # ------------------------------------------------
+
+            db_emergency.hospital_id = new_hospital.id
+
+    # ========================================================
+    # AUTOMATIC STATUS
+    # ========================================================
+
+    # If both ambulance and hospital are assigned,
+    # automatically mark the emergency as Assigned
+    # when it was previously Pending.
+
+    if (
+        db_emergency.ambulance_id is not None
+        and db_emergency.hospital_id is not None
+        and db_emergency.status == "Pending"
+    ):
+
+        db_emergency.status = "Assigned"
+
+    # ========================================================
+    # SAVE CHANGES
+    # ========================================================
+
+    try:
+
+        db.commit()
+
+        db.refresh(db_emergency)
+
+    except Exception:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update emergency"
         )
 
-    db.commit()
-
-    db.refresh(db_emergency)
+    # ========================================================
+    # RESPONSE
+    # ========================================================
 
     return {
+
         "message": "Emergency updated successfully",
 
         "data": emergency_response(
@@ -631,11 +852,27 @@ def complete_emergency(
     # COMMIT
     # ========================================================
 
-    db.commit()
+    try:
 
-    db.refresh(emergency)
+        db.commit()
+
+        db.refresh(emergency)
+
+    except Exception:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to complete emergency"
+        )
+
+    # ========================================================
+    # RESPONSE
+    # ========================================================
 
     return {
+
         "message": "Emergency completed successfully",
 
         "data": emergency_response(
