@@ -3,7 +3,7 @@ import "./Emergencies.css";
 
 const API_URL = "http://127.0.0.1:8000";
 
-function Emergencies() {
+function Emergencies({ onNavigate }) {
   const [emergencies, setEmergencies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,6 +29,17 @@ function Emergencies() {
 
   const goToDashboard = () => {
     window.location.assign("/dashboard");
+  };
+
+  const openEmergency = (emergencyId) => {
+    const path = `/emergencies/${emergencyId}`;
+
+    if (typeof onNavigate === "function") {
+      onNavigate(path);
+      return;
+    }
+
+    window.location.assign(path);
   };
 
   // ==========================================
@@ -832,7 +843,19 @@ function Emergencies() {
 
               <tbody>
                 {emergencies.map((emergency) => (
-                  <tr key={emergency.id}>
+                  <tr
+                    key={emergency.id}
+                    onClick={() => openEmergency(emergency.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openEmergency(emergency.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    title={`Open Emergency #${String(emergency.id).padStart(3, "0")}`}
+                    style={{ cursor: "pointer" }}
+                  >
                     {/* ID */}
                     <td>
                       <strong>
@@ -956,11 +979,10 @@ function Emergencies() {
                           <button
                             type="button"
                             className="complete-button"
-                            onClick={() =>
-                              completeEmergency(
-                                emergency.id
-                              )
-                            }
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              completeEmergency(emergency.id);
+                            }}
                             disabled={
                               completingId ===
                                 emergency.id ||
@@ -981,11 +1003,32 @@ function Emergencies() {
 
                         <button
                           type="button"
-                          onClick={() =>
-                            deleteEmergency(
-                              emergency.id
-                            )
-                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEmergency(emergency.id);
+                          }}
+                          style={{
+                            minWidth: "58px",
+                            height: "30px",
+                            padding: "0 10px",
+                            border: "1px solid #2563eb",
+                            borderRadius: "7px",
+                            background: "#ffffff",
+                            color: "#2563eb",
+                            fontSize: "10px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                          }}
+                        >
+                          View
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            deleteEmergency(emergency.id);
+                          }}
                           disabled={
                             deletingId ===
                               emergency.id ||
