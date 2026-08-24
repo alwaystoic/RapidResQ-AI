@@ -1,8 +1,3 @@
-print("======================================")
-print("AUTH FILE LOADED")
-print(__file__)
-print("======================================")
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -12,6 +7,7 @@ from backend.schemas.user import UserCreate, UserLogin
 
 from backend.auth.hashing import hash_password, verify_password
 from backend.auth.security import create_access_token
+
 
 router = APIRouter(
     prefix="/auth",
@@ -27,31 +23,13 @@ def register(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
-    print("========== REGISTER CALLED ==========")
-    print(user)
-
-    # DEBUG: Show all users
-    print("\n===== USERS IN DATABASE =====")
-    users = db.query(User).all()
-    for u in users:
-        print(
-            f"ID={u.id} | Email={u.email} | Phone={u.phone}"
-        )
-    print("=============================\n")
-
+    # Check whether email or phone already exists
     existing_user = db.query(User).filter(
         (User.email == user.email) |
         (User.phone == user.phone)
     ).first()
 
-    print("Incoming email:", user.email)
-    print("Incoming phone:", user.phone)
-    print("Existing user:", existing_user)
-
     if existing_user:
-
-        print("Existing email:", existing_user.email)
-        print("Existing phone:", existing_user.phone)
 
         if existing_user.email == user.email:
             raise HTTPException(
@@ -65,33 +43,26 @@ def register(
                 detail="Phone number already registered"
             )
 
-    print("Hashing password...")
+    # Hash password before storing it
+    hashed_password = hash_password(user.password)
 
-    hashed = hash_password(user.password)
-
-    print("Hashed successfully")
-
+    # Public registration ALWAYS creates a Citizen
     new_user = User(
         full_name=user.full_name,
         email=user.email,
         phone=user.phone,
-        password=hashed,
-        role=user.role
+        password=hashed_password,
+        role="Citizen",
+        status="Active"
     )
 
-    print("Adding user...")
     db.add(new_user)
-
-    print("Committing...")
     db.commit()
-
-    print("Refreshing...")
     db.refresh(new_user)
 
-    print("DONE!")
-
     return {
-        "message": "User registered successfully"
+        "message": "User registered successfully",
+        "role": new_user.role
     }
 
 
@@ -103,43 +74,35 @@ def login(
     login_data: UserLogin,
     db: Session = Depends(get_db)
 ):
-    print("\n========== LOGIN CALLED ==========")
-    print("Incoming email:", repr(login_data.email))
-    print("Incoming password:", repr(login_data.password))
-
     user = db.query(User).filter(
         User.email == login_data.email
     ).first()
 
-    print("User object:", user)
-
-    if user:
-        print("DB email:", repr(user.email))
-        print("DB password hash:", user.password)
-        print(
-            "Password verification:",
-            verify_password(login_data.password, user.password)
-        )
-
+    # Same generic error for unknown email/password
     if not user:
-        print("User NOT found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
 
+    # Verify password
     if not verify_password(
         login_data.password,
         user.password
     ):
-        print("Password mismatch")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
 
-    print("Login successful")
+    # Prevent inactive users from logging in
+    if user.status != "Active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive"
+        )
 
+    # Generate JWT
     access_token = create_access_token(
         data={
             "sub": user.email,

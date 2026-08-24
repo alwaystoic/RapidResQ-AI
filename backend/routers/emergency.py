@@ -457,21 +457,43 @@ def update_emergency(
     # UPDATE STATUS
     # ========================================================
 
+        # ========================================================
+    # UPDATE STATUS
+    # ========================================================
+
     if emergency.status is not None:
 
         allowed_statuses = {
             "Pending",
-            "Assigned",
-            "Completed"
+            "Assigned"
         }
 
         if emergency.status not in allowed_statuses:
-
             raise HTTPException(
                 status_code=400,
                 detail=(
                     "Invalid status. Allowed values: "
-                    "Pending, Assigned, Completed"
+                    "Pending, Assigned. "
+                    "Use /emergencies/{emergency_id}/complete "
+                    "to complete an emergency."
+                )
+            )
+
+        current_status = db_emergency.status
+
+        # Prevent invalid status transitions
+        if current_status == "Pending" and emergency.status != "Assigned":
+            raise HTTPException(
+                status_code=400,
+                detail="Pending emergency can only be changed to Assigned"
+            )
+
+        if current_status == "Assigned" and emergency.status != "Pending":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Assigned emergency can only be changed to Pending. "
+                    "Use the complete endpoint to mark it Completed."
                 )
             )
 
@@ -777,17 +799,17 @@ def complete_emergency(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("Admin"))
 ):
+    # ========================================================
+    # FIND EMERGENCY
+    # ========================================================
 
     emergency = (
         db.query(Emergency)
-        .filter(
-            Emergency.id == emergency_id
-        )
+        .filter(Emergency.id == emergency_id)
         .first()
     )
 
     if not emergency:
-
         raise HTTPException(
             status_code=404,
             detail="Emergency not found"
@@ -798,68 +820,63 @@ def complete_emergency(
     # ========================================================
 
     if emergency.status == "Completed":
-
         raise HTTPException(
             status_code=400,
             detail="Emergency already completed"
         )
 
-    # ========================================================
-    # MARK COMPLETED
-    # ========================================================
-
-    emergency.status = "Completed"
-
-    # ========================================================
-    # RELEASE AMBULANCE
-    # ========================================================
-
-    if emergency.ambulance_id is not None:
-
-        ambulance = (
-            db.query(Ambulance)
-            .filter(
-                Ambulance.id ==
-                emergency.ambulance_id
-            )
-            .first()
-        )
-
-        if ambulance:
-
-            ambulance.status = "Available"
-
-    # ========================================================
-    # RELEASE HOSPITAL BED
-    # ========================================================
-
-    if emergency.hospital_id is not None:
-
-        hospital = (
-            db.query(Hospital)
-            .filter(
-                Hospital.id ==
-                emergency.hospital_id
-            )
-            .first()
-        )
-
-        if hospital:
-
-            hospital.available_beds += 1
-
-    # ========================================================
-    # COMMIT
-    # ========================================================
-
     try:
+        # ====================================================
+        # RELEASE AMBULANCE
+        # ====================================================
+
+        if emergency.ambulance_id is not None:
+
+            ambulance = (
+                db.query(Ambulance)
+                .filter(
+                    Ambulance.id == emergency.ambulance_id
+                )
+                .first()
+            )
+
+            if ambulance:
+
+                # Only release the ambulance if it is currently
+                # assigned/busy.
+                if ambulance.status == "Busy":
+                    ambulance.status = "Available"
+
+        # ====================================================
+        # RELEASE HOSPITAL BED
+        # ====================================================
+
+        if emergency.hospital_id is not None:
+
+            hospital = (
+                db.query(Hospital)
+                .filter(
+                    Hospital.id == emergency.hospital_id
+                )
+                .first()
+            )
+
+            if hospital:
+
+                # Prevent negative/incorrect bed accounting.
+                # A completed emergency releases exactly one bed.
+                hospital.available_beds += 1
+
+        # ====================================================
+        # MARK COMPLETED
+        # ====================================================
+
+        emergency.status = "Completed"
 
         db.commit()
-
         db.refresh(emergency)
 
     except Exception:
-
         db.rollback()
 
         raise HTTPException(
@@ -872,9 +889,7 @@ def complete_emergency(
     # ========================================================
 
     return {
-
         "message": "Emergency completed successfully",
-
         "data": emergency_response(
             emergency,
             db
