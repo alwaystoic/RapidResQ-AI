@@ -1,87 +1,32 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const API_URL = "http://127.0.0.1:8000";
 
-const EMPTY_FORM = {
-  patient_name: "",
-  phone: "",
-  emergency_type: "",
-  location: "",
-  severity: "High",
-  latitude: "",
-  longitude: "",
-};
-
 function CitizenDashboard({ onLogout }) {
   const [emergency, setEmergency] = useState(null);
+  const [emergencyHistory, setEmergencyHistory] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [creating, setCreating] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [formError, setFormError] = useState("");
-
-  const [form, setForm] = useState(EMPTY_FORM);
-
+  const [location, setLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState("");
 
-  // ==========================================================
+  // ============================================================
   // GET TOKEN
-  // ==========================================================
+  // ============================================================
 
   const getToken = () => {
     return (
       localStorage.getItem("access_token") ||
-      localStorage.getItem("token") ||
-      ""
+      localStorage.getItem("token")
     );
   };
 
-  // ==========================================================
-  // GET EMERGENCY ID
-  // ==========================================================
-
-  const getEmergencyId = () => {
-    const params = new URLSearchParams(window.location.search);
-
-    return (
-      params.get("emergency_id") ||
-      params.get("emergencyId") ||
-      params.get("id") ||
-      localStorage.getItem("emergency_id") ||
-      localStorage.getItem("emergencyId") ||
-      localStorage.getItem("current_emergency_id") ||
-      ""
-    );
-  };
-
-  // ==========================================================
-  // SAVE EMERGENCY ID
-  // ==========================================================
-
-  const saveEmergencyId = (id) => {
-    if (!id) {
-      return;
-    }
-
-    const stringId = String(id);
-
-    localStorage.setItem("emergency_id", stringId);
-    localStorage.setItem("emergencyId", stringId);
-    localStorage.setItem("current_emergency_id", stringId);
-
-    const url = new URL(window.location.href);
-
-    url.searchParams.set("emergency_id", stringId);
-
-    window.history.replaceState({}, "", url.toString());
-  };
-
-  // ==========================================================
+  // ============================================================
   // LOGOUT
-  // ==========================================================
+  // ============================================================
 
   const handleLogout = () => {
     if (typeof onLogout === "function") {
@@ -89,88 +34,34 @@ function CitizenDashboard({ onLogout }) {
       return;
     }
 
-    const keys = [
-      "access_token",
-      "token",
-      "user_role",
-      "user_email",
-      "emergency_id",
-      "emergencyId",
-      "current_emergency_id",
-    ];
-
-    keys.forEach((key) => {
-      localStorage.removeItem(key);
-    });
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user_role");
+    localStorage.removeItem("user_email");
+    localStorage.removeItem("emergency_id");
 
     window.location.assign("/");
   };
 
-  // ==========================================================
-  // API ERROR MESSAGE
-  // ==========================================================
+  // ============================================================
+  // LOAD ALL CITIZEN EMERGENCIES
+  // ============================================================
 
-  const getApiErrorMessage = (data, fallback) => {
-    if (!data) {
-      return fallback;
-    }
-
-    if (Array.isArray(data.detail)) {
-      return data.detail
-        .map((item) => {
-          if (typeof item === "string") {
-            return item;
-          }
-
-          const field = Array.isArray(item?.loc)
-            ? item.loc[item.loc.length - 1]
-            : "field";
-
-          return `${field}: ${item?.msg || "Invalid value"}`;
-        })
-        .join(" | ");
-    }
-
-    if (typeof data.detail === "string") {
-      return data.detail;
-    }
-
-    if (typeof data.message === "string") {
-      return data.message;
-    }
-
-    return fallback;
-  };
-
-  // ==========================================================
-  // LOAD SINGLE EMERGENCY
-  // ==========================================================
-
-  const loadEmergency = async (idOverride = null) => {
-    const token = getToken();
-
-    if (!token) {
-      setError("No authentication token found. Please login again.");
-      setLoading(false);
-      return;
-    }
-
-    const id = idOverride || getEmergencyId();
-
-    // Citizen can open dashboard even without an emergency.
-    if (!id) {
-      setEmergency(null);
-      setError("");
-      setLoading(false);
-      return;
-    }
+  const loadEmergency = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
     try {
-      setLoading(true);
-      setError("");
+      const token = getToken();
+
+      if (!token) {
+        throw new Error(
+          "No authentication token found. Please login again."
+        );
+      }
 
       const response = await fetch(
-        `${API_URL}/emergencies/${encodeURIComponent(id)}`,
+        `${API_URL}/emergencies/my`,
         {
           method: "GET",
           headers: {
@@ -188,231 +79,163 @@ function CitizenDashboard({ onLogout }) {
         data = null;
       }
 
+      // ========================================================
+      // ERROR HANDLING
+      // ========================================================
+
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error("Session expired. Please login again.");
+          throw new Error(
+            "Session expired. Please login again."
+          );
         }
 
         if (response.status === 403) {
           throw new Error(
-            "You do not have permission to view this emergency."
+            "You do not have permission to access your emergencies."
           );
         }
 
-        if (response.status === 404) {
-          throw new Error(`Emergency #${id} was not found.`);
-        }
-
         throw new Error(
-          getApiErrorMessage(
-            data,
-            `Unable to load emergency (${response.status}).`
-          )
+          data?.detail ||
+            data?.message ||
+            `Unable to load emergencies (${response.status}).`
         );
       }
 
-      setEmergency(data);
-      saveEmergencyId(data?.id || id);
+      // ========================================================
+      // EXTRACT EMERGENCY LIST
+      // ========================================================
+
+      let emergencies = [];
+
+      if (Array.isArray(data)) {
+        emergencies = data;
+      } else if (Array.isArray(data?.emergencies)) {
+        emergencies = data.emergencies;
+      } else if (data?.emergency) {
+        emergencies = [data.emergency];
+      }
+
+      // ========================================================
+      // SORT NEWEST FIRST
+      // ========================================================
+
+      const sortedEmergencies = [...emergencies].sort(
+        (a, b) => {
+          const dateA = a?.created_at
+            ? new Date(a.created_at).getTime()
+            : Number(a?.id || 0);
+
+          const dateB = b?.created_at
+            ? new Date(b.created_at).getTime()
+            : Number(b?.id || 0);
+
+          return dateB - dateA;
+        }
+      );
+
+      // ========================================================
+      // STORE COMPLETE HISTORY
+      // ========================================================
+
+      setEmergencyHistory(sortedEmergencies);
+
+      // ========================================================
+      // FIND ACTIVE EMERGENCY
+      //
+      // Pending + Assigned = Active
+      // Completed = History only
+      // ========================================================
+
+      const activeEmergencies = sortedEmergencies.filter(
+        (item) => {
+          const status = String(
+            item?.status || ""
+          ).toLowerCase();
+
+          return (
+            status === "pending" ||
+            status === "assigned"
+          );
+        }
+      );
+
+      const activeEmergency =
+        activeEmergencies.length > 0
+          ? activeEmergencies[0]
+          : null;
+
+      // ========================================================
+      // STORE ACTIVE EMERGENCY ID
+      // ========================================================
+
+      if (activeEmergency?.id != null) {
+        localStorage.setItem(
+          "emergency_id",
+          String(activeEmergency.id)
+        );
+      } else {
+        localStorage.removeItem("emergency_id");
+      }
+
+      setEmergency(activeEmergency);
     } catch (err) {
-      console.error("Emergency fetch error:", err);
+      console.error(
+        "Citizen emergency fetch error:",
+        err
+      );
 
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to load emergency."
+          : "Unable to load emergency information."
       );
+
+      setEmergency(null);
+      setEmergencyHistory([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // ==========================================================
+  // ============================================================
   // INITIAL LOAD
-  // ==========================================================
+  // ============================================================
 
   useEffect(() => {
-    let cancelled = false;
-
-    const timer = window.setTimeout(async () => {
-      if (cancelled) {
-        return;
-      }
-
-      const token = getToken();
-
-      if (!token) {
-        if (!cancelled) {
-          setError(
-            "No authentication token found. Please login again."
-          );
-          setLoading(false);
-        }
-
-        return;
-      }
-
-      const id = getEmergencyId();
-
-      // No emergency yet is NOT an error.
-      if (!id) {
-        if (!cancelled) {
-          setEmergency(null);
-          setError("");
-          setLoading(false);
-        }
-
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `${API_URL}/emergencies/${encodeURIComponent(id)}`,
-          {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        let data = null;
-
-        try {
-          data = await response.json();
-        } catch {
-          data = null;
-        }
-
-        if (!response.ok) {
-          let message;
-
-          if (response.status === 401) {
-            message = "Session expired. Please login again.";
-          } else if (response.status === 403) {
-            message =
-              "You do not have permission to view this emergency.";
-          } else if (response.status === 404) {
-            message = `Emergency #${id} was not found.`;
-          } else {
-            message = getApiErrorMessage(
-              data,
-              `Unable to load emergency (${response.status}).`
-            );
-          }
-
-          throw new Error(message);
-        }
-
-        if (!cancelled) {
-          setEmergency(data);
-          setError("");
-
-          if (data?.id) {
-            saveEmergencyId(data.id);
-          }
-        }
-      } catch (err) {
-        console.error("Initial emergency load error:", err);
-
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load emergency."
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+    const timer = window.setTimeout(() => {
+      loadEmergency();
     }, 0);
 
     return () => {
-      cancelled = true;
       window.clearTimeout(timer);
     };
-  }, []);
+  }, [loadEmergency]);
 
-  // ==========================================================
-  // FORM CHANGE
-  // ==========================================================
+  // ============================================================
+  // GET CURRENT LOCATION
+  // ============================================================
 
-  const handleFormChange = (event) => {
-    const { name, value } = event.target;
-
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
-
-    setFormError("");
-  };
-
-  // ==========================================================
-  // OPEN CREATE FORM
-  // ==========================================================
-
-  const openCreateForm = () => {
-    setFormError("");
+  const getCurrentLocation = () => {
     setLocationMessage("");
-
-    setForm({
-      ...EMPTY_FORM,
-    });
-
-    setShowCreateForm(true);
-  };
-
-  // ==========================================================
-  // CLOSE CREATE FORM
-  // ==========================================================
-
-  const closeCreateForm = () => {
-    if (creating) {
-      return;
-    }
-
-    setShowCreateForm(false);
-    setFormError("");
-    setLocationMessage("");
-
-    setForm({
-      ...EMPTY_FORM,
-    });
-  };
-
-  // ==========================================================
-  // GET CURRENT LOCATION FOR FORM
-  // ==========================================================
-
-  const useCurrentLocation = () => {
-    setFormError("");
-    setLocationMessage("");
+    setLocationLoading(true);
 
     if (!navigator.geolocation) {
-      setFormError(
+      setLocationMessage(
         "Geolocation is not supported by this browser."
       );
+
+      setLocationLoading(false);
       return;
     }
-
-    setLocationLoading(true);
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const latitude =
-          position.coords.latitude.toFixed(6);
-
-        const longitude =
-          position.coords.longitude.toFixed(6);
-
-        setForm((current) => ({
-          ...current,
-          latitude,
-          longitude,
-        }));
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
 
         setLocationMessage(
           "Current location detected successfully."
@@ -422,12 +245,12 @@ function CitizenDashboard({ onLogout }) {
       },
       (geoError) => {
         const messages = {
-          1: "Location permission was denied. Allow location access and try again.",
+          1: "Location permission was denied. Please allow location access and try again.",
           2: "Your current location could not be determined.",
           3: "Location request timed out. Please try again.",
         };
 
-        setFormError(
+        setLocationMessage(
           messages[geoError.code] ||
             "Unable to get your current location."
         );
@@ -442,199 +265,9 @@ function CitizenDashboard({ onLogout }) {
     );
   };
 
-  // ==========================================================
-  // CREATE NEW EMERGENCY
-  // ==========================================================
-
-  const createEmergency = async (event) => {
-    event.preventDefault();
-
-    if (creating) {
-      return;
-    }
-
-    setFormError("");
-    setError("");
-
-    const patientName = form.patient_name.trim();
-    const phone = form.phone.trim();
-    const emergencyType =
-      form.emergency_type.trim();
-    const location = form.location.trim();
-
-    const latitude = Number(form.latitude);
-    const longitude = Number(form.longitude);
-
-    // --------------------------------------------------------
-    // VALIDATION
-    // --------------------------------------------------------
-
-    if (!patientName) {
-      setFormError("Please enter the patient's name.");
-      return;
-    }
-
-    if (!phone) {
-      setFormError("Please enter a phone number.");
-      return;
-    }
-
-    if (!emergencyType) {
-      setFormError("Please enter the emergency type.");
-      return;
-    }
-
-    if (!location) {
-      setFormError("Please enter the emergency location.");
-      return;
-    }
-
-    if (!form.severity) {
-      setFormError("Please select a severity.");
-      return;
-    }
-
-    if (
-      form.latitude.trim() === "" ||
-      form.longitude.trim() === ""
-    ) {
-      setFormError(
-        "Please provide your location using GPS or enter latitude and longitude manually."
-      );
-      return;
-    }
-
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude)
-    ) {
-      setFormError(
-        "Latitude and longitude must be valid numbers."
-      );
-      return;
-    }
-
-    if (latitude < -90 || latitude > 90) {
-      setFormError("Latitude must be between -90 and 90.");
-      return;
-    }
-
-    if (longitude < -180 || longitude > 180) {
-      setFormError(
-        "Longitude must be between -180 and 180."
-      );
-      return;
-    }
-
-    const token = getToken();
-
-    if (!token) {
-      setFormError(
-        "You are not logged in. Please login again."
-      );
-      return;
-    }
-
-    // --------------------------------------------------------
-    // CREATE REQUEST
-    // --------------------------------------------------------
-
-    try {
-      setCreating(true);
-
-      const response = await fetch(
-        `${API_URL}/emergencies`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            patient_name: patientName,
-            phone,
-            emergency_type: emergencyType,
-            location,
-            severity: form.severity,
-            latitude,
-            longitude,
-          }),
-        }
-      );
-
-      let data = {};
-
-      try {
-        data = await response.json();
-      } catch {
-        data = {};
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          getApiErrorMessage(
-            data,
-            `Failed to create emergency (${response.status}).`
-          )
-        );
-      }
-
-      // ------------------------------------------------------
-      // GET CREATED EMERGENCY ID
-      // ------------------------------------------------------
-
-      const createdEmergency =
-        data?.data || data?.emergency || data;
-
-      const newEmergencyId =
-        createdEmergency?.id ||
-        data?.id ||
-        null;
-
-      if (!newEmergencyId) {
-        throw new Error(
-          "Emergency was created, but the server did not return an emergency ID."
-        );
-      }
-
-      // ------------------------------------------------------
-      // SAVE NEW ID
-      // ------------------------------------------------------
-
-      saveEmergencyId(newEmergencyId);
-
-      // ------------------------------------------------------
-      // CLOSE FORM
-      // ------------------------------------------------------
-
-      setShowCreateForm(false);
-      setFormError("");
-      setForm({
-        ...EMPTY_FORM,
-      });
-
-      // ------------------------------------------------------
-      // LOAD COMPLETE EMERGENCY DETAILS
-      // ------------------------------------------------------
-
-      await loadEmergency(newEmergencyId);
-    } catch (err) {
-      console.error("Create emergency error:", err);
-
-      setFormError(
-        err instanceof Error
-          ? err.message
-          : "Unable to create emergency."
-      );
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  // ==========================================================
+  // ============================================================
   // LOADING SCREEN
-  // ==========================================================
+  // ============================================================
 
   if (loading) {
     return (
@@ -646,93 +279,48 @@ function CitizenDashboard({ onLogout }) {
         </h2>
 
         <p style={styles.muted}>
-          Preparing your citizen dashboard.
+          Fetching your emergency response details.
         </p>
       </div>
     );
   }
 
-  // ==========================================================
+  // ============================================================
   // ERROR SCREEN
-  // ==========================================================
+  // ============================================================
 
-  if (error && !emergency) {
+  if (error) {
     return (
       <div style={styles.page}>
-        <header style={styles.header}>
-          <div>
-            <strong style={styles.brand}>
-              RapidResQ AI 🚑
-            </strong>
-
-            <small style={styles.small}>
-              Citizen Dashboard
-            </small>
-          </div>
-
-          <button
-            type="button"
-            style={styles.logout}
-            onClick={handleLogout}
-          >
-            Logout
-          </button>
-        </header>
+        <Header onLogout={handleLogout} />
 
         <main style={styles.container}>
           <div style={styles.errorCard}>
-            <div style={{ fontSize: 42 }}>
-              ⚠️
-            </div>
+            <div style={{ fontSize: 45 }}>⚠️</div>
 
             <h2>
-              Unable to load dashboard
+              Unable to load emergencies
             </h2>
 
             <p style={styles.muted}>
               {error}
             </p>
 
-            <div style={styles.buttonRow}>
-              <button
-                type="button"
-                style={styles.primary}
-                onClick={() => loadEmergency()}
-              >
-                ↻ Try Again
-              </button>
-
-              <button
-                type="button"
-                style={styles.secondary}
-                onClick={openCreateForm}
-              >
-                🚨 Create Emergency
-              </button>
-            </div>
+            <button
+              style={styles.primary}
+              onClick={loadEmergency}
+            >
+              ↻ Try Again
+            </button>
           </div>
         </main>
-
-        {showCreateForm && (
-          <CreateEmergencyModal
-            form={form}
-            creating={creating}
-            formError={formError}
-            locationLoading={locationLoading}
-            locationMessage={locationMessage}
-            onChange={handleFormChange}
-            onSubmit={createEmergency}
-            onClose={closeCreateForm}
-            onUseCurrentLocation={useCurrentLocation}
-          />
-        )}
       </div>
     );
   }
 
-  // ==========================================================
-  // AMBULANCE DATA
-  // ==========================================================
+  // ============================================================
+  // AMBULANCE DATA FOR ACTIVE EMERGENCY
+  // ============================================================
 
   const ambulance =
     emergency?.ambulance || null;
@@ -756,137 +344,102 @@ function CitizenDashboard({ onLogout }) {
         )} minutes`
       : "—";
 
-  // ==========================================================
+  // ============================================================
   // MAIN DASHBOARD
-  // ==========================================================
+  // ============================================================
 
   return (
     <div style={styles.page}>
-      {/* ======================================================
-          HEADER
-      ====================================================== */}
-
-      <header style={styles.header}>
-        <div>
-          <strong style={styles.brand}>
-            RapidResQ AI 🚑
-          </strong>
-
-          <small style={styles.small}>
-            Citizen Dashboard
-          </small>
-        </div>
-
-        <button
-          type="button"
-          style={styles.logout}
-          onClick={handleLogout}
-        >
-          Logout
-        </button>
-      </header>
-
-      {/* ======================================================
-          MAIN
-      ====================================================== */}
+      <Header onLogout={handleLogout} />
 
       <main style={styles.container}>
-        {/* ====================================================
-            TOP BAR
-        ==================================================== */}
+
+        {/* ======================================================
+            PAGE TITLE
+        ====================================================== */}
 
         <div style={styles.topRow}>
           <div>
             <h1 style={styles.title}>
-              {emergency
-                ? `Emergency #${emergency.id}`
-                : "Citizen Dashboard"}
+              Citizen Dashboard
             </h1>
 
             <p style={styles.muted}>
-              {emergency
-                ? "Real-time emergency response information"
-                : "Manage your RapidResQ emergency requests"}
+              Manage your RapidResQ emergency requests
             </p>
           </div>
 
-          <div style={styles.buttonRow}>
-            {emergency && (
-              <button
-                type="button"
-                style={styles.secondary}
-                onClick={() => loadEmergency()}
-              >
-                ↻ Refresh
-              </button>
-            )}
-
-            <button
-              type="button"
-              style={styles.primary}
-              onClick={openCreateForm}
-            >
-              🚨 Create New Emergency
-            </button>
-          </div>
+          <button
+            style={styles.secondary}
+            onClick={loadEmergency}
+          >
+            ↻ Refresh
+          </button>
         </div>
 
-        {/* ====================================================
-            GENERAL ERROR
-        ==================================================== */}
+        {/* ======================================================
+            ACTIVE EMERGENCY
+        ====================================================== */}
 
-        {error && emergency && (
-          <div style={styles.warning}>
-            ⚠️ {error}
-          </div>
-        )}
-
-        {/* ====================================================
-            NO EMERGENCY STATE
-        ==================================================== */}
-
-        {!emergency && (
-          <section style={styles.emptyDashboard}>
-            <div style={styles.bigEmergencyIcon}>
-              🚨
-            </div>
-
-            <h2 style={{ margin: "10px 0 8px" }}>
-              No Active Emergency
-            </h2>
-
-            <p style={styles.muted}>
-              You currently do not have an emergency
-              request registered with RapidResQ.
-            </p>
-
-            <button
-              type="button"
-              style={styles.primary}
-              onClick={openCreateForm}
-            >
-              🚨 Create New Emergency
-            </button>
-          </section>
-        )}
-
-        {/* ====================================================
-            EMERGENCY STATUS
-        ==================================================== */}
-
-        {emergency && (
+        {emergency ? (
           <>
+            <section style={styles.activeBanner}>
+              <div>
+                <span style={styles.label}>
+                  ACTIVE EMERGENCY
+                </span>
+
+                <h2 style={{ margin: "6px 0 0" }}>
+                  Emergency #{emergency.id}
+                </h2>
+
+                <p style={styles.muted}>
+                  Your emergency is currently being handled.
+                </p>
+              </div>
+
+              <div style={styles.statusRow}>
+                <span
+                  style={getStatusStyle(
+                    emergency.status
+                  )}
+                >
+                  {emergency.status || "Unknown"}
+                </span>
+
+                <span
+                  style={getSeverityStyle(
+                    emergency.severity
+                  )}
+                >
+                  {emergency.severity || "Unknown"} Severity
+                </span>
+              </div>
+            </section>
+
+            {/* ==================================================
+                EMERGENCY STATUS
+            ================================================== */}
+
             <section style={styles.card}>
               <span style={styles.label}>
                 EMERGENCY STATUS
               </span>
 
               <div style={styles.statusRow}>
-                <span style={styles.status}>
+                <span
+                  style={getStatusStyle(
+                    emergency.status
+                  )}
+                >
                   {emergency.status || "Unknown"}
                 </span>
 
-                <span style={styles.severity}>
+                <span
+                  style={getSeverityStyle(
+                    emergency.severity
+                  )}
+                >
                   {emergency.severity || "Unknown"} Severity
                 </span>
               </div>
@@ -922,13 +475,13 @@ function CitizenDashboard({ onLogout }) {
                         ? `Ambulance #${String(
                             ambulance.id
                           ).padStart(3, "0")}`
-                        : "Not assigned")}
+                        : "Not Assigned")}
                   </h2>
                 </div>
 
                 <span style={styles.ambulanceStatus}>
                   {ambulance?.status ||
-                    "Not assigned"}
+                    "Not Assigned"}
                 </span>
               </div>
 
@@ -985,7 +538,7 @@ function CitizenDashboard({ onLogout }) {
                     />
 
                     <Metric
-                      icon="⏱"
+                      icon="⏱️"
                       label="Estimated arrival"
                       value={eta}
                     />
@@ -993,7 +546,7 @@ function CitizenDashboard({ onLogout }) {
                 </>
               ) : (
                 <div style={styles.empty}>
-                  <div style={{ fontSize: 38 }}>
+                  <div style={{ fontSize: 40 }}>
                     🚑
                   </div>
 
@@ -1003,7 +556,7 @@ function CitizenDashboard({ onLogout }) {
 
                   <p style={styles.muted}>
                     RapidResQ will assign an available
-                    ambulance when one is available.
+                    ambulance when one becomes available.
                   </p>
                 </div>
               )}
@@ -1036,7 +589,7 @@ function CitizenDashboard({ onLogout }) {
                   value={
                     emergency.hospital_id
                       ? "Hospital Assigned"
-                      : "Pending Assignment"
+                      : "Awaiting Assignment"
                   }
                 />
               </div>
@@ -1094,15 +647,12 @@ function CitizenDashboard({ onLogout }) {
                 </div>
 
                 <button
-                  type="button"
                   style={{
                     ...styles.primary,
                     opacity:
-                      locationLoading
-                        ? 0.65
-                        : 1,
+                      locationLoading ? 0.65 : 1,
                   }}
-                  onClick={useCurrentLocationForDashboard}
+                  onClick={getCurrentLocation}
                   disabled={locationLoading}
                 >
                   {locationLoading
@@ -1115,6 +665,24 @@ function CitizenDashboard({ onLogout }) {
                 <p style={styles.message}>
                   {locationMessage}
                 </p>
+              )}
+
+              {location && (
+                <div style={styles.grid2}>
+                  <Info
+                    label="Latitude"
+                    value={location.latitude.toFixed(
+                      6
+                    )}
+                  />
+
+                  <Info
+                    label="Longitude"
+                    value={location.longitude.toFixed(
+                      6
+                    )}
+                  />
+                </div>
               )}
             </section>
 
@@ -1144,382 +712,406 @@ function CitizenDashboard({ onLogout }) {
                 />
 
                 <Info
-                  label="Hospital ID"
-                  value={
-                    emergency.hospital_id ??
-                    "Not assigned"
-                  }
+                  label="Emergency ID"
+                  value={emergency.id}
+                />
+              </div>
+            </section>
+
+            {/* ==================================================
+                SYSTEM INFORMATION
+            ================================================== */}
+
+            <section style={styles.card}>
+              <span style={styles.label}>
+                SYSTEM INFORMATION
+              </span>
+
+              <div style={styles.grid3}>
+                <Info
+                  label="Emergency ID"
+                  value={emergency.id}
+                />
+
+                <Info
+                  label="User ID"
+                  value={emergency.user_id}
+                />
+
+                <Info
+                  label="Created At"
+                  value={formatDate(
+                    emergency.created_at
+                  )}
                 />
               </div>
             </section>
           </>
-        )}
-      </main>
+        ) : (
+          /* ====================================================
+             NO ACTIVE EMERGENCY
+          ==================================================== */
 
-      {/* ======================================================
-          CREATE EMERGENCY MODAL
-      ====================================================== */}
+          <section style={styles.emptyPage}>
+            <div style={{ fontSize: 55 }}>🛡️</div>
 
-      {showCreateForm && (
-        <CreateEmergencyModal
-          form={form}
-          creating={creating}
-          formError={formError}
-          locationLoading={locationLoading}
-          locationMessage={locationMessage}
-          onChange={handleFormChange}
-          onSubmit={createEmergency}
-          onClose={closeCreateForm}
-          onUseCurrentLocation={useCurrentLocation}
-        />
-      )}
-    </div>
-  );
-
-  // ==========================================================
-  // CURRENT LOCATION FOR EXISTING DASHBOARD
-  // ==========================================================
-
-  function useCurrentLocationForDashboard() {
-    setLocationMessage("");
-    setLocationLoading(true);
-
-    if (!navigator.geolocation) {
-      setLocationMessage(
-        "Geolocation is not supported by this browser."
-      );
-      setLocationLoading(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocationMessage(
-          `Current location: ${position.coords.latitude.toFixed(
-            6
-          )}, ${position.coords.longitude.toFixed(6)}`
-        );
-
-        setLocationLoading(false);
-      },
-      (geoError) => {
-        const messages = {
-          1: "Location permission was denied.",
-          2: "Your current location could not be determined.",
-          3: "Location request timed out.",
-        };
-
-        setLocationMessage(
-          messages[geoError.code] ||
-            "Unable to get your current location."
-        );
-
-        setLocationLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
-    );
-  }
-}
-
-// ============================================================
-// CREATE EMERGENCY MODAL
-// ============================================================
-
-function CreateEmergencyModal({
-  form,
-  creating,
-  formError,
-  locationLoading,
-  locationMessage,
-  onChange,
-  onSubmit,
-  onClose,
-  onUseCurrentLocation,
-}) {
-  return (
-    <div
-      style={styles.modalOverlay}
-      onMouseDown={(event) => {
-        if (
-          event.target === event.currentTarget &&
-          !creating
-        ) {
-          onClose();
-        }
-      }}
-    >
-      <div style={styles.modal}>
-        <div style={styles.modalHeader}>
-          <div>
-            <h2 style={styles.modalTitle}>
-              🚨 Create New Emergency
+            <h2>
+              No Active Emergency
             </h2>
 
             <p style={styles.muted}>
-              Submit an emergency request to RapidResQ.
+              You currently do not have an active
+              emergency being handled by RapidResQ.
             </p>
-          </div>
 
-          <button
-            type="button"
-            style={styles.closeButton}
-            onClick={onClose}
-            disabled={creating}
-          >
-            ×
-          </button>
-        </div>
+            <p style={styles.muted}>
+              Your previous emergency records are
+              available below.
+            </p>
 
-        <form onSubmit={onSubmit}>
-          {/* ==================================================
-              PATIENT NAME
-          ================================================== */}
-
-          <div style={styles.formGroup}>
-            <label style={styles.formLabel}>
-              Patient Name
-            </label>
-
-            <input
-              type="text"
-              name="patient_name"
-              value={form.patient_name}
-              onChange={onChange}
-              placeholder="Enter patient name"
-              style={styles.input}
-              disabled={creating}
-            />
-          </div>
-
-          {/* ==================================================
-              PHONE
-          ================================================== */}
-
-          <div style={styles.formGroup}>
-            <label style={styles.formLabel}>
-              Phone Number
-            </label>
-
-            <input
-              type="tel"
-              name="phone"
-              value={form.phone}
-              onChange={onChange}
-              placeholder="Enter phone number"
-              style={styles.input}
-              disabled={creating}
-            />
-          </div>
-
-          {/* ==================================================
-              EMERGENCY TYPE
-          ================================================== */}
-
-          <div style={styles.formGroup}>
-            <label style={styles.formLabel}>
-              Emergency Type
-            </label>
-
-            <input
-              type="text"
-              name="emergency_type"
-              value={form.emergency_type}
-              onChange={onChange}
-              placeholder="Example: Accident, Medical, Fire"
-              style={styles.input}
-              disabled={creating}
-            />
-          </div>
-
-          {/* ==================================================
-              LOCATION
-          ================================================== */}
-
-          <div style={styles.formGroup}>
-            <label style={styles.formLabel}>
-              Emergency Location
-            </label>
-
-            <input
-              type="text"
-              name="location"
-              value={form.location}
-              onChange={onChange}
-              placeholder="Example: Pune"
-              style={styles.input}
-              disabled={creating}
-            />
-          </div>
-
-          {/* ==================================================
-              SEVERITY
-          ================================================== */}
-
-          <div style={styles.formGroup}>
-            <label style={styles.formLabel}>
-              Severity
-            </label>
-
-            <select
-              name="severity"
-              value={form.severity}
-              onChange={onChange}
-              style={styles.input}
-              disabled={creating}
+            <button
+              style={styles.secondary}
+              onClick={loadEmergency}
             >
-              <option value="Low">
-                Low
-              </option>
+              ↻ Refresh
+            </button>
+          </section>
+        )}
 
-              <option value="Medium">
-                Medium
-              </option>
+        {/* ======================================================
+            EMERGENCY HISTORY
+        ====================================================== */}
 
-              <option value="High">
-                High
-              </option>
-
-              <option value="Critical">
-                Critical
-              </option>
-            </select>
-
-            <small style={styles.helperText}>
-              RapidResQ will determine the final severity
-              using the backend AI service.
-            </small>
-          </div>
-
-          {/* ==================================================
-              GPS BUTTON
-          ================================================== */}
-
-          <div style={styles.locationActionBox}>
+        <section style={styles.card}>
+          <div style={styles.cardTop}>
             <div>
-              <strong>
-                📍 Emergency Coordinates
-              </strong>
+              <span style={styles.label}>
+                EMERGENCY HISTORY
+              </span>
+
+              <h2 style={styles.cardTitle}>
+                📋 Your Emergency Records
+              </h2>
 
               <p style={styles.muted}>
-                Use your current GPS location or enter
-                coordinates manually.
+                Every emergency you have created is
+                retained here, including completed cases.
               </p>
             </div>
 
-            <button
-              type="button"
-              style={styles.secondary}
-              onClick={onUseCurrentLocation}
-              disabled={creating || locationLoading}
-            >
-              {locationLoading
-                ? "Detecting..."
-                : "📍 Use Current Location"}
-            </button>
+            <div style={styles.historyCount}>
+              {emergencyHistory.length}{" "}
+              {emergencyHistory.length === 1
+                ? "Emergency"
+                : "Emergencies"}
+            </div>
           </div>
 
-          {locationMessage && (
-            <div style={styles.successMessage}>
-              ✓ {locationMessage}
+          {emergencyHistory.length === 0 ? (
+            <div style={styles.empty}>
+              <div style={{ fontSize: 40 }}>
+                📋
+              </div>
+
+              <h3>
+                No Emergency Records
+              </h3>
+
+              <p style={styles.muted}>
+                You have not created any emergency
+                requests yet.
+              </p>
+            </div>
+          ) : (
+            <div style={styles.historyList}>
+              {emergencyHistory.map(
+                (historyEmergency) => (
+                  <EmergencyHistoryCard
+                    key={
+                      historyEmergency.id
+                    }
+                    emergency={
+                      historyEmergency
+                    }
+                    activeId={
+                      emergency?.id
+                    }
+                  />
+                )
+              )}
             </div>
           )}
+        </section>
 
-          {/* ==================================================
-              LATITUDE / LONGITUDE
-          ================================================== */}
+      </main>
+    </div>
+  );
+}
 
-          <div style={styles.grid2}>
-            <div style={styles.formGroup}>
-              <label style={styles.formLabel}>
-                Latitude
-              </label>
+// ============================================================
+// HEADER
+// ============================================================
 
-              <input
-                type="number"
-                step="any"
-                name="latitude"
-                value={form.latitude}
-                onChange={onChange}
-                placeholder="18.5204"
-                style={styles.input}
-                disabled={creating}
-              />
-            </div>
+function Header({ onLogout }) {
+  return (
+    <header style={styles.header}>
+      <div>
+        <strong style={styles.brand}>
+          RapidResQ AI 🚑
+        </strong>
 
-            <div style={styles.formGroup}>
-              <label style={styles.formLabel}>
-                Longitude
-              </label>
+        <small style={styles.small}>
+          Citizen Dashboard
+        </small>
+      </div>
 
-              <input
-                type="number"
-                step="any"
-                name="longitude"
-                value={form.longitude}
-                onChange={onChange}
-                placeholder="73.8567"
-                style={styles.input}
-                disabled={creating}
-              />
-            </div>
-          </div>
+      <button
+        style={styles.logout}
+        onClick={onLogout}
+      >
+        Logout
+      </button>
+    </header>
+  );
+}
 
-          {/* ==================================================
-              FORM ERROR
-          ================================================== */}
+// ============================================================
+// EMERGENCY HISTORY CARD
+// ============================================================
 
-          {formError && (
-            <div style={styles.formError}>
-              ⚠️ {formError}
-            </div>
-          )}
+function EmergencyHistoryCard({
+  emergency,
+  activeId,
+}) {
+  const isActive =
+    emergency.id === activeId;
 
-          {/* ==================================================
-              ACTIONS
-          ================================================== */}
+  const ambulance =
+    emergency?.ambulance || null;
 
-          <div style={styles.modalActions}>
-            <button
-              type="button"
-              style={styles.cancelButton}
-              onClick={onClose}
-              disabled={creating}
-            >
-              Cancel
-            </button>
+  return (
+    <div
+      style={{
+        ...styles.historyCard,
+        ...(isActive
+          ? styles.historyCardActive
+          : {}),
+      }}
+    >
+      <div style={styles.historyHeader}>
+        <div>
+          <span style={styles.label}>
+            EMERGENCY #{emergency.id}
+          </span>
 
-            <button
-              type="submit"
-              style={{
-                ...styles.primary,
-                opacity: creating ? 0.7 : 1,
-              }}
-              disabled={creating}
-            >
-              {creating
-                ? "Creating Emergency..."
-                : "🚨 Create Emergency"}
-            </button>
-          </div>
-        </form>
+          <h3 style={styles.historyTitle}>
+            {emergency.emergency_type ||
+              "Emergency"}
+          </h3>
+        </div>
+
+        <div style={styles.statusRow}>
+          <span
+            style={getStatusStyle(
+              emergency.status
+            )}
+          >
+            {emergency.status ||
+              "Unknown"}
+          </span>
+
+          <span
+            style={getSeverityStyle(
+              emergency.severity
+            )}
+          >
+            {emergency.severity ||
+              "Unknown"}
+          </span>
+        </div>
+      </div>
+
+      <div style={styles.grid4}>
+        <Info
+          label="Patient"
+          value={emergency.patient_name}
+        />
+
+        <Info
+          label="Location"
+          value={emergency.location}
+        />
+
+        <Info
+          label="Ambulance"
+          value={
+            ambulance?.vehicle ||
+            emergency.ambulance_id ||
+            "Not assigned"
+          }
+        />
+
+        <Info
+          label="Hospital"
+          value={
+            emergency.hospital_id ??
+            "Not assigned"
+          }
+        />
+      </div>
+
+      <div style={styles.historyFooter}>
+        <div>
+          <span style={styles.historyDateLabel}>
+            Created
+          </span>
+
+          <strong>
+            {formatDate(
+              emergency.created_at
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span style={styles.historyDateLabel}>
+            Emergency ID
+          </span>
+
+          <strong>
+            #{emergency.id}
+          </strong>
+        </div>
+
+        {isActive && (
+          <span style={styles.activeRecord}>
+            ● Currently Active
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
 // ============================================================
-// FORMAT COORDINATE
+// FORMAT COORDINATES
 // ============================================================
 
 function formatCoord(value) {
-  return value == null ||
+  if (
+    value == null ||
     Number.isNaN(Number(value))
-    ? "—"
-    : Number(value).toFixed(4);
+  ) {
+    return "—";
+  }
+
+  return Number(value).toFixed(4);
+}
+
+// ============================================================
+// FORMAT DATE
+// ============================================================
+
+function formatDate(value) {
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString();
+}
+
+// ============================================================
+// STATUS STYLE
+// ============================================================
+
+function getStatusStyle(status) {
+  const normalized = String(
+    status || ""
+  ).toLowerCase();
+
+  if (normalized === "assigned") {
+    return {
+      ...styles.status,
+      background: "#dcfce7",
+      color: "#166534",
+    };
+  }
+
+  if (normalized === "completed") {
+    return {
+      ...styles.status,
+      background: "#dbeafe",
+      color: "#1d4ed8",
+    };
+  }
+
+  if (normalized === "pending") {
+    return {
+      ...styles.status,
+      background: "#fef3c7",
+      color: "#92400e",
+    };
+  }
+
+  return {
+    ...styles.status,
+    background: "#e5e7eb",
+    color: "#374151",
+  };
+}
+
+// ============================================================
+// SEVERITY STYLE
+// ============================================================
+
+function getSeverityStyle(severity) {
+  const normalized = String(
+    severity || ""
+  ).toLowerCase();
+
+  if (normalized === "critical") {
+    return {
+      ...styles.severity,
+      background: "#fee2e2",
+      color: "#991b1b",
+    };
+  }
+
+  if (normalized === "high") {
+    return {
+      ...styles.severity,
+      background: "#ffedd5",
+      color: "#9a3412",
+    };
+  }
+
+  if (normalized === "medium") {
+    return {
+      ...styles.severity,
+      background: "#fef3c7",
+      color: "#92400e",
+    };
+  }
+
+  if (normalized === "low") {
+    return {
+      ...styles.severity,
+      background: "#dcfce7",
+      color: "#166534",
+    };
+  }
+
+  return {
+    ...styles.severity,
+    background: "#e5e7eb",
+    color: "#374151",
+  };
 }
 
 // ============================================================
@@ -1544,7 +1136,11 @@ function Info({ label, value }) {
 // METRIC COMPONENT
 // ============================================================
 
-function Metric({ icon, label, value }) {
+function Metric({
+  icon,
+  label,
+  value,
+}) {
   return (
     <div style={styles.metric}>
       <div style={{ fontSize: 25 }}>
@@ -1588,7 +1184,7 @@ const styles = {
   },
 
   loadingIcon: {
-    fontSize: 46,
+    fontSize: 48,
   },
 
   header: {
@@ -1597,8 +1193,9 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    background: "#fff",
-    borderBottom: "1px solid #e5e7eb",
+    background: "#ffffff",
+    borderBottom:
+      "1px solid #e5e7eb",
     boxSizing: "border-box",
   },
 
@@ -1642,11 +1239,30 @@ const styles = {
   },
 
   card: {
-    background: "#fff",
-    border: "1px solid #e5e7eb",
+    background: "#ffffff",
+    border:
+      "1px solid #e5e7eb",
     borderRadius: 16,
     padding: 22,
     marginBottom: 18,
+    boxShadow:
+      "0 5px 18px rgba(15,23,42,.05)",
+  },
+
+  activeBanner: {
+    background: "#ffffff",
+    border:
+      "1px solid #fecaca",
+    borderLeft:
+      "5px solid #dc2626",
+    borderRadius: 16,
+    padding: 22,
+    marginBottom: 18,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 15,
+    flexWrap: "wrap",
     boxShadow:
       "0 5px 18px rgba(15,23,42,.05)",
   },
@@ -1681,8 +1297,6 @@ const styles = {
   },
 
   status: {
-    background: "#dcfce7",
-    color: "#166534",
     borderRadius: 999,
     padding: "7px 12px",
     fontWeight: 800,
@@ -1690,8 +1304,6 @@ const styles = {
   },
 
   severity: {
-    background: "#fee2e2",
-    color: "#991b1b",
     borderRadius: 999,
     padding: "7px 12px",
     fontWeight: 800,
@@ -1717,28 +1329,29 @@ const styles = {
   grid2: {
     display: "grid",
     gridTemplateColumns:
-      "repeat(2,minmax(0,1fr))",
+      "repeat(auto-fit,minmax(220px,1fr))",
     gap: 12,
   },
 
   grid3: {
     display: "grid",
     gridTemplateColumns:
-      "repeat(3,minmax(0,1fr))",
+      "repeat(auto-fit,minmax(200px,1fr))",
     gap: 12,
   },
 
   grid4: {
     display: "grid",
     gridTemplateColumns:
-      "repeat(4,minmax(0,1fr))",
+      "repeat(auto-fit,minmax(180px,1fr))",
     gap: 12,
     marginTop: 15,
   },
 
   info: {
     background: "#f8fafc",
-    border: "1px solid #e5e7eb",
+    border:
+      "1px solid #e5e7eb",
     borderRadius: 11,
     padding: 14,
     minWidth: 0,
@@ -1760,17 +1373,19 @@ const styles = {
 
   locationBox: {
     background: "#fbfdff",
-    border: "1px solid #e5e7eb",
+    border:
+      "1px solid #e5e7eb",
     borderRadius: 13,
     padding: 17,
     margin: "16px 0",
   },
 
   metric: {
-    border: "1px solid #e5e7eb",
+    border:
+      "1px solid #e5e7eb",
     borderRadius: 13,
     padding: 18,
-    background: "#fff",
+    background: "#ffffff",
   },
 
   metricValue: {
@@ -1783,22 +1398,22 @@ const styles = {
     textAlign: "center",
     padding: 28,
     background: "#fafafa",
-    border: "1px dashed #d1d5db",
+    border:
+      "1px dashed #d1d5db",
     borderRadius: 13,
   },
 
-  emptyDashboard: {
-    background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 18,
-    padding: 60,
+  emptyPage: {
+    maxWidth: 750,
+    margin: "0 auto 20px",
+    padding: 35,
+    background: "#ffffff",
+    border:
+      "1px solid #e5e7eb",
+    borderRadius: 16,
     textAlign: "center",
     boxShadow:
       "0 5px 18px rgba(15,23,42,.05)",
-  },
-
-  bigEmergencyIcon: {
-    fontSize: 60,
   },
 
   message: {
@@ -1809,52 +1424,10 @@ const styles = {
     fontSize: 13,
   },
 
-  warning: {
-    padding: 14,
-    marginBottom: 18,
-    background: "#fff7ed",
-    color: "#9a3412",
-    border: "1px solid #fed7aa",
-    borderRadius: 10,
-    fontSize: 14,
-    fontWeight: 600,
-  },
-
-  successMessage: {
-    marginTop: 10,
-    marginBottom: 12,
-    padding: 11,
-    background: "#f0fdf4",
-    color: "#166534",
-    border:
-      "1px solid #bbf7d0",
-    borderRadius: 9,
-    fontSize: 13,
-  },
-
-  formError: {
-    marginTop: 15,
-    padding: 12,
-    background: "#fef2f2",
-    color: "#991b1b",
-    border:
-      "1px solid #fecaca",
-    borderRadius: 9,
-    fontSize: 13,
-    fontWeight: 600,
-  },
-
-  buttonRow: {
-    display: "flex",
-    gap: 10,
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-
   primary: {
     border: 0,
     background: "#dc2626",
-    color: "#fff",
+    color: "#ffffff",
     borderRadius: 9,
     padding: "11px 16px",
     fontWeight: 700,
@@ -1864,7 +1437,7 @@ const styles = {
   secondary: {
     border:
       "1px solid #d1d5db",
-    background: "#fff",
+    background: "#ffffff",
     color: "#374151",
     borderRadius: 9,
     padding: "10px 16px",
@@ -1875,7 +1448,7 @@ const styles = {
   logout: {
     border:
       "1px solid #e5e7eb",
-    background: "#fff",
+    background: "#ffffff",
     borderRadius: 9,
     padding: "10px 15px",
     fontWeight: 700,
@@ -1886,129 +1459,79 @@ const styles = {
     maxWidth: 650,
     margin: "70px auto",
     padding: 35,
-    background: "#fff",
+    background: "#ffffff",
     border:
       "1px solid #fecaca",
     borderRadius: 16,
     textAlign: "center",
   },
 
-  modalOverlay: {
-    position: "fixed",
-    inset: 0,
-    background:
-      "rgba(15,23,42,.55)",
+  historyCount: {
+    background: "#eef2ff",
+    color: "#3730a3",
+    borderRadius: 999,
+    padding: "8px 13px",
+    fontSize: 13,
+    fontWeight: 800,
+  },
+
+  historyList: {
     display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-    zIndex: 1000,
-    overflowY: "auto",
+    flexDirection: "column",
+    gap: 14,
   },
 
-  modal: {
-    width: "min(720px, 100%)",
-    maxHeight: "90vh",
-    overflowY: "auto",
-    background: "#fff",
-    borderRadius: 18,
-    padding: 24,
-    boxShadow:
-      "0 20px 60px rgba(0,0,0,.2)",
-    boxSizing: "border-box",
+  historyCard: {
+    background: "#ffffff",
+    border:
+      "1px solid #e5e7eb",
+    borderRadius: 14,
+    padding: 18,
   },
 
-  modalHeader: {
+  historyCardActive: {
+    border:
+      "2px solid #dc2626",
+    background: "#fffafa",
+  },
+
+  historyHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 15,
-    marginBottom: 20,
-  },
-
-  modalTitle: {
-    margin: 0,
-    fontSize: 24,
-  },
-
-  closeButton: {
-    width: 38,
-    height: 38,
-    border:
-      "1px solid #e5e7eb",
-    background: "#fff",
-    borderRadius: 9,
-    fontSize: 24,
-    lineHeight: 1,
-    cursor: "pointer",
-  },
-
-  formGroup: {
-    marginBottom: 16,
-  },
-
-  formLabel: {
-    display: "block",
-    marginBottom: 7,
-    fontSize: 13,
-    fontWeight: 700,
-    color: "#374151",
-  },
-
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border:
-      "1px solid #d1d5db",
-    borderRadius: 9,
-    padding: "12px 13px",
-    fontSize: 14,
-    outline: "none",
-    background: "#fff",
-    color: "#111827",
-  },
-
-  helperText: {
-    display: "block",
-    marginTop: 6,
-    color: "#6b7280",
-    fontSize: 12,
-    lineHeight: 1.4,
-  },
-
-  locationActionBox: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 15,
     flexWrap: "wrap",
-    background: "#f8fafc",
-    border:
-      "1px solid #e5e7eb",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 12,
   },
 
-  modalActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 10,
-    marginTop: 22,
-    paddingTop: 18,
+  historyTitle: {
+    margin: "5px 0 0",
+    fontSize: 19,
+  },
+
+  historyFooter: {
+    marginTop: 14,
+    paddingTop: 14,
     borderTop:
       "1px solid #e5e7eb",
+    display: "flex",
+    alignItems: "center",
+    gap: 25,
+    flexWrap: "wrap",
+    fontSize: 13,
   },
 
-  cancelButton: {
-    border:
-      "1px solid #d1d5db",
-    background: "#fff",
-    color: "#374151",
-    borderRadius: 9,
-    padding: "11px 16px",
-    fontWeight: 700,
-    cursor: "pointer",
+  historyDateLabel: {
+    display: "block",
+    color: "#6b7280",
+    fontSize: 11,
+    marginBottom: 3,
+  },
+
+  activeRecord: {
+    marginLeft: "auto",
+    color: "#dc2626",
+    fontWeight: 800,
+    fontSize: 13,
   },
 };
 
