@@ -1,18 +1,20 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./Emergencies.css";
 
 const API_URL = "http://127.0.0.1:8000";
 
-function Emergencies({ onNavigate }) {
+function Emergencies() {
   const [emergencies, setEmergencies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completingId, setCompletingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
+
   const [form, setForm] = useState({
     patient_name: "",
     phone: "",
@@ -23,38 +25,52 @@ function Emergencies({ onNavigate }) {
     longitude: "",
   });
 
-  // ==========================================
+  // ============================================================
+  // TOKEN
+  // ============================================================
+
+  const getToken = () => {
+    return (
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token")
+    );
+  };
+
+  // ============================================================
   // NAVIGATION
-  // ==========================================
+  // ============================================================
 
   const goToDashboard = () => {
     window.location.assign("/dashboard");
   };
 
+  /*
+   * IMPORTANT:
+   * Use direct browser navigation here instead of relying on
+   * the App.jsx onNavigate callback.
+   *
+   * This guarantees:
+   * /emergencies
+   *      ->
+   * /emergencies/28
+   */
   const openEmergency = (emergencyId) => {
-    const path = `/emergencies/${emergencyId}`;
-
-    if (typeof onNavigate === "function") {
-      onNavigate(path);
+    if (
+      emergencyId === null ||
+      emergencyId === undefined ||
+      emergencyId === ""
+    ) {
       return;
     }
 
-    window.location.assign(path);
+    window.location.assign(`/emergencies/${emergencyId}`);
   };
 
-  // ==========================================
-  // GET TOKEN
-  // ==========================================
-
-  const getToken = () => {
-    return localStorage.getItem("access_token");
-  };
-
-  // ==========================================
+  // ============================================================
   // FETCH EMERGENCIES
-  // ==========================================
+  // ============================================================
 
-  const fetchEmergencies = async () => {
+  const fetchEmergencies = useCallback(async () => {
     const token = getToken();
 
     if (!token) {
@@ -72,8 +88,18 @@ function Emergencies({ onNavigate }) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Session expired. Please login again.");
+      }
+
+      if (response.status === 403) {
+        throw new Error(
+          "You do not have permission to view emergencies."
+        );
+      }
+
       throw new Error(
-        data.detail || "Failed to load emergencies."
+        data?.detail || "Failed to load emergencies."
       );
     }
 
@@ -81,27 +107,29 @@ function Emergencies({ onNavigate }) {
       return data;
     }
 
-    if (Array.isArray(data.emergencies)) {
+    if (Array.isArray(data?.emergencies)) {
       return data.emergencies;
     }
 
     return [];
-  };
+  }, []);
 
-  // ==========================================
+  // ============================================================
   // INITIAL LOAD
-  // ==========================================
+  // ============================================================
 
   useEffect(() => {
     let cancelled = false;
 
     const loadEmergencies = async () => {
       try {
+        setLoading(true);
+        setError("");
+
         const data = await fetchEmergencies();
 
         if (!cancelled) {
           setEmergencies(data);
-          setError("");
         }
       } catch (err) {
         console.error("Emergency fetch error:", err);
@@ -125,11 +153,11 @@ function Emergencies({ onNavigate }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fetchEmergencies]);
 
-  // ==========================================
+  // ============================================================
   // REFRESH
-  // ==========================================
+  // ============================================================
 
   const refreshEmergencies = async () => {
     try {
@@ -152,22 +180,29 @@ function Emergencies({ onNavigate }) {
     }
   };
 
-  // ==========================================
-
-  // ==========================================
-  // CREATE EMERGENCY
-  // ==========================================
+  // ============================================================
+  // CREATE FORM
+  // ============================================================
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+
+    setForm((current) => ({
+      ...current,
+      [name]: value,
+    }));
+
     setFormError("");
   };
 
   const closeCreateForm = () => {
-    if (creating) return;
+    if (creating) {
+      return;
+    }
+
     setShowCreateForm(false);
     setFormError("");
+
     setForm({
       patient_name: "",
       phone: "",
@@ -181,8 +216,11 @@ function Emergencies({ onNavigate }) {
 
   const useCurrentLocation = () => {
     setFormError("");
+
     if (!navigator.geolocation) {
-      setFormError("Geolocation is not supported by this browser.");
+      setFormError(
+        "Geolocation is not supported by this browser."
+      );
       return;
     }
 
@@ -199,13 +237,24 @@ function Emergencies({ onNavigate }) {
           "Unable to get your current location. Enter latitude and longitude manually."
         );
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
     );
   };
 
+  // ============================================================
+  // CREATE EMERGENCY
+  // ============================================================
+
   const createEmergency = async (event) => {
     event.preventDefault();
-    if (creating) return;
+
+    if (creating) {
+      return;
+    }
 
     setFormError("");
     setError("");
@@ -214,6 +263,7 @@ function Emergencies({ onNavigate }) {
     const phone = form.phone.trim();
     const emergencyType = form.emergency_type.trim();
     const location = form.location.trim();
+
     const latitude = Number(form.latitude);
     const longitude = Number(form.longitude);
 
@@ -230,12 +280,18 @@ function Emergencies({ onNavigate }) {
       return;
     }
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      setFormError("Latitude and longitude must be valid numbers.");
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      setFormError(
+        "Latitude and longitude must be valid numbers."
+      );
       return;
     }
 
     const token = getToken();
+
     if (!token) {
       setFormError("You are not logged in.");
       return;
@@ -267,40 +323,53 @@ function Emergencies({ onNavigate }) {
       if (!response.ok) {
         let message = "Failed to create emergency.";
 
-        if (Array.isArray(data.detail)) {
+        if (Array.isArray(data?.detail)) {
           message = data.detail
             .map((item) => {
-              if (typeof item === "string") return item;
+              if (typeof item === "string") {
+                return item;
+              }
+
               const field = Array.isArray(item?.loc)
                 ? item.loc[item.loc.length - 1]
                 : "field";
-              return `${field}: ${item?.msg || "Invalid value"}`;
+
+              return `${field}: ${
+                item?.msg || "Invalid value"
+              }`;
             })
             .join(" | ");
-        } else if (typeof data.detail === "string") {
+        } else if (typeof data?.detail === "string") {
           message = data.detail;
-        } else if (typeof data.message === "string") {
+        } else if (typeof data?.message === "string") {
           message = data.message;
         }
 
         throw new Error(message);
       }
 
-      const updatedEmergencies = await fetchEmergencies();
+      const updatedEmergencies =
+        await fetchEmergencies();
+
       setEmergencies(updatedEmergencies);
+
       closeCreateForm();
     } catch (err) {
       console.error("Create emergency error:", err);
+
       setFormError(
-        err instanceof Error ? err.message : "Unable to create emergency."
+        err instanceof Error
+          ? err.message
+          : "Unable to create emergency."
       );
     } finally {
       setCreating(false);
     }
   };
 
+  // ============================================================
   // COMPLETE EMERGENCY
-  // ==========================================
+  // ============================================================
 
   const completeEmergency = async (emergencyId) => {
     try {
@@ -328,15 +397,20 @@ function Emergencies({ onNavigate }) {
 
       if (!response.ok) {
         throw new Error(
-          data.detail || "Failed to complete emergency."
+          data?.detail ||
+            "Failed to complete emergency."
         );
       }
 
-      const updatedEmergencies = await fetchEmergencies();
+      const updatedEmergencies =
+        await fetchEmergencies();
 
       setEmergencies(updatedEmergencies);
     } catch (err) {
-      console.error("Complete emergency error:", err);
+      console.error(
+        "Complete emergency error:",
+        err
+      );
 
       setError(
         err instanceof Error
@@ -348,9 +422,9 @@ function Emergencies({ onNavigate }) {
     }
   };
 
-  // ==========================================
+  // ============================================================
   // DELETE EMERGENCY
-  // ==========================================
+  // ============================================================
 
   const deleteEmergency = async (emergencyId) => {
     const confirmed = window.confirm(
@@ -388,17 +462,22 @@ function Emergencies({ onNavigate }) {
 
       if (!response.ok) {
         throw new Error(
-          data.detail || "Failed to delete emergency."
+          data?.detail ||
+            "Failed to delete emergency."
         );
       }
 
-      setEmergencies((currentEmergencies) =>
-        currentEmergencies.filter(
-          (emergency) => emergency.id !== emergencyId
+      setEmergencies((current) =>
+        current.filter(
+          (emergency) =>
+            emergency.id !== emergencyId
         )
       );
     } catch (err) {
-      console.error("Delete emergency error:", err);
+      console.error(
+        "Delete emergency error:",
+        err
+      );
 
       setError(
         err instanceof Error
@@ -410,12 +489,14 @@ function Emergencies({ onNavigate }) {
     }
   };
 
-  // ==========================================
-  // SEVERITY CLASS
-  // ==========================================
+  // ============================================================
+  // CSS HELPERS
+  // ============================================================
 
   const getSeverityClass = (severity) => {
-    switch (String(severity || "").toLowerCase()) {
+    switch (
+      String(severity || "").toLowerCase()
+    ) {
       case "critical":
         return "severity critical";
 
@@ -433,12 +514,10 @@ function Emergencies({ onNavigate }) {
     }
   };
 
-  // ==========================================
-  // STATUS CLASS
-  // ==========================================
-
   const getStatusClass = (status) => {
-    switch (String(status || "").toLowerCase()) {
+    switch (
+      String(status || "").toLowerCase()
+    ) {
       case "pending":
         return "status pending";
 
@@ -453,10 +532,6 @@ function Emergencies({ onNavigate }) {
     }
   };
 
-  // ==========================================
-  // DATE FORMAT
-  // ==========================================
-
   const formatDate = (dateString) => {
     if (!dateString) {
       return "N/A";
@@ -465,15 +540,15 @@ function Emergencies({ onNavigate }) {
     const date = new Date(dateString);
 
     if (Number.isNaN(date.getTime())) {
-      return dateString;
+      return String(dateString);
     }
 
     return date.toLocaleString();
   };
 
-  // ==========================================
+  // ============================================================
   // LOADING
-  // ==========================================
+  // ============================================================
 
   if (loading) {
     return (
@@ -481,7 +556,9 @@ function Emergencies({ onNavigate }) {
         <header className="emergencies-header">
           <div>
             <h1>Emergencies</h1>
-            <p>Manage and monitor emergency cases</p>
+            <p>
+              Manage and monitor emergency cases
+            </p>
           </div>
         </header>
 
@@ -494,13 +571,17 @@ function Emergencies({ onNavigate }) {
     );
   }
 
-  // ==========================================
+  // ============================================================
   // PAGE
-  // ==========================================
+  // ============================================================
 
   return (
     <main className="emergencies-main">
-      {/* HEADER */}
+
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
+
       <header className="emergencies-header">
         <div>
           <button
@@ -533,56 +614,85 @@ function Emergencies({ onNavigate }) {
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <button
-          type="button"
-          className="refresh-button"
-          onClick={refreshEmergencies}
-          disabled={refreshing}
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+          }}
         >
-          {refreshing ? "↻ Refreshing..." : "↻ Refresh"}
-        </button>
+          <button
+            type="button"
+            onClick={refreshEmergencies}
+            disabled={refreshing}
+            style={{
+              minHeight: "38px",
+              padding: "0 14px",
+              border: "1px solid #d1d5db",
+              borderRadius: "7px",
+              background: "#ffffff",
+              color: "#374151",
+              fontWeight: "600",
+              cursor: refreshing
+                ? "not-allowed"
+                : "pointer",
+              opacity: refreshing ? 0.6 : 1,
+            }}
+          >
+            {refreshing ? "Refreshing..." : "↻ Refresh"}
+          </button>
+
           <button
             type="button"
             onClick={() => {
               setShowCreateForm(true);
               setFormError("");
-              setError("");
             }}
-            style={{
-              minHeight: "40px",
-              padding: "0 16px",
-              border: "1px solid #dc2626",
-              borderRadius: "8px",
-              background: "#dc2626",
-              color: "#ffffff",
-              fontSize: "13px",
-              fontWeight: "700",
-              cursor: "pointer",
-            }}
+            style={primaryButtonStyle}
           >
             + Create Emergency
           </button>
         </div>
       </header>
 
-      {/* ERROR */}
+      {/* =====================================================
+          ERROR
+      ====================================================== */}
+
       {error && (
-        <div className="error-message">
+        <div
+          style={{
+            margin: "0 22px 15px",
+            padding: "12px 14px",
+            border: "1px solid #fecaca",
+            borderRadius: "8px",
+            background: "#fef2f2",
+            color: "#b91c1c",
+            fontSize: "13px",
+            fontWeight: "600",
+          }}
+        >
           {error}
         </div>
       )}
 
+      {/* =====================================================
+          CREATE EMERGENCY FORM
+      ====================================================== */}
 
       {showCreateForm && (
         <section
           className="emergencies-card"
-          style={{ marginBottom: "18px", border: "1px solid #fecaca" }}
+          style={{
+            marginBottom: "18px",
+          }}
         >
           <div className="card-header">
             <div>
               <h2>Create Emergency</h2>
-              <p>Submit a new emergency to the RapidResQ backend</p>
+              <p>
+                Enter the emergency information
+              </p>
             </div>
           </div>
 
@@ -591,61 +701,50 @@ function Emergencies({ onNavigate }) {
             style={{
               padding: "20px",
               display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gridTemplateColumns:
+                "repeat(2, minmax(0, 1fr))",
               gap: "16px",
             }}
           >
             <label style={labelStyle}>
               Patient Name
+
               <input
                 name="patient_name"
                 value={form.patient_name}
                 onChange={handleFormChange}
-                placeholder="e.g. Rahul Sharma"
+                placeholder="Enter patient name"
                 style={inputStyle}
               />
             </label>
 
             <label style={labelStyle}>
               Phone
+
               <input
                 name="phone"
                 value={form.phone}
                 onChange={handleFormChange}
-                placeholder="e.g. 9876543210"
-                inputMode="tel"
+                placeholder="Enter phone number"
                 style={inputStyle}
               />
             </label>
 
             <label style={labelStyle}>
               Emergency Type
+
               <input
                 name="emergency_type"
                 value={form.emergency_type}
                 onChange={handleFormChange}
-                placeholder="e.g. Accident, Heart Attack"
+                placeholder="e.g. Accident"
                 style={inputStyle}
               />
             </label>
 
             <label style={labelStyle}>
-              Severity
-              <select
-                name="severity"
-                value={form.severity}
-                onChange={handleFormChange}
-                style={inputStyle}
-              >
-                <option value="Critical">Critical</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
-            </label>
-
-            <label style={labelStyle}>
               Location
+
               <input
                 name="location"
                 value={form.location}
@@ -655,11 +754,46 @@ function Emergencies({ onNavigate }) {
               />
             </label>
 
-            <div style={{ display: "flex", alignItems: "end" }}>
+            <label style={labelStyle}>
+              Severity
+
+              <select
+                name="severity"
+                value={form.severity}
+                onChange={handleFormChange}
+                style={inputStyle}
+              >
+                <option value="Critical">
+                  Critical
+                </option>
+
+                <option value="High">
+                  High
+                </option>
+
+                <option value="Medium">
+                  Medium
+                </option>
+
+                <option value="Low">
+                  Low
+                </option>
+              </select>
+            </label>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-end",
+              }}
+            >
               <button
                 type="button"
                 onClick={useCurrentLocation}
-                style={secondaryButtonStyle}
+                style={{
+                  ...secondaryButtonStyle,
+                  width: "100%",
+                }}
               >
                 📍 Use Current Location
               </button>
@@ -667,6 +801,7 @@ function Emergencies({ onNavigate }) {
 
             <label style={labelStyle}>
               Latitude
+
               <input
                 name="latitude"
                 value={form.latitude}
@@ -679,6 +814,7 @@ function Emergencies({ onNavigate }) {
 
             <label style={labelStyle}>
               Longitude
+
               <input
                 name="longitude"
                 value={form.longitude}
@@ -729,25 +865,37 @@ function Emergencies({ onNavigate }) {
                 style={{
                   ...primaryButtonStyle,
                   opacity: creating ? 0.65 : 1,
-                  cursor: creating ? "not-allowed" : "pointer",
+                  cursor: creating
+                    ? "not-allowed"
+                    : "pointer",
                 }}
               >
-                {creating ? "Creating..." : "Create Emergency"}
+                {creating
+                  ? "Creating..."
+                  : "Create Emergency"}
               </button>
             </div>
           </form>
         </section>
       )}
 
-      {/* STATISTICS */}
+      {/* =====================================================
+          STATISTICS
+      ====================================================== */}
+
       <section className="emergency-stats">
+
         <div className="emergency-stat-card">
           <span>Total Emergencies</span>
-          <strong>{emergencies.length}</strong>
+
+          <strong>
+            {emergencies.length}
+          </strong>
         </div>
 
         <div className="emergency-stat-card pending-stat">
           <span>Pending</span>
+
           <strong>
             {
               emergencies.filter(
@@ -760,6 +908,7 @@ function Emergencies({ onNavigate }) {
 
         <div className="emergency-stat-card assigned-stat">
           <span>Assigned</span>
+
           <strong>
             {
               emergencies.filter(
@@ -772,6 +921,7 @@ function Emergencies({ onNavigate }) {
 
         <div className="emergency-stat-card critical-stat">
           <span>Critical</span>
+
           <strong>
             {
               emergencies.filter(
@@ -784,6 +934,7 @@ function Emergencies({ onNavigate }) {
 
         <div className="emergency-stat-card completed-stat">
           <span>Completed</span>
+
           <strong>
             {
               emergencies.filter(
@@ -793,25 +944,35 @@ function Emergencies({ onNavigate }) {
             }
           </strong>
         </div>
+
       </section>
 
-      {/* EMERGENCIES CARD */}
+      {/* =====================================================
+          ALL EMERGENCIES
+      ====================================================== */}
+
       <section className="emergencies-card">
+
         <div className="card-header">
           <div>
             <h2>All Emergencies</h2>
-            <p>All reported emergency cases</p>
+
+            <p>
+              All reported emergency cases
+            </p>
           </div>
 
           <span className="case-count">
             {emergencies.length}{" "}
-            {emergencies.length === 1 ? "case" : "cases"}
+            {emergencies.length === 1
+              ? "case"
+              : "cases"}
           </span>
         </div>
 
-        {/* EMPTY STATE */}
         {emergencies.length === 0 ? (
           <div className="empty-state">
+
             <div className="empty-icon">
               🚨
             </div>
@@ -819,13 +980,16 @@ function Emergencies({ onNavigate }) {
             <h3>No emergencies found</h3>
 
             <p>
-              There are currently no emergency cases
-              in the system.
+              There are currently no emergency
+              cases in the system.
             </p>
+
           </div>
         ) : (
           <div className="emergency-table-wrapper">
+
             <table className="emergency-table">
+
               <thead>
                 <tr>
                   <th>ID</th>
@@ -842,56 +1006,79 @@ function Emergencies({ onNavigate }) {
               </thead>
 
               <tbody>
+
                 {emergencies.map((emergency) => (
+
                   <tr
                     key={emergency.id}
-                    onClick={() => openEmergency(emergency.id)}
+                    onClick={() =>
+                      openEmergency(emergency.id)
+                    }
                     onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
                         event.preventDefault();
-                        openEmergency(emergency.id);
+
+                        openEmergency(
+                          emergency.id
+                        );
                       }
                     }}
                     tabIndex={0}
-                    title={`Open Emergency #${String(emergency.id).padStart(3, "0")}`}
-                    style={{ cursor: "pointer" }}
+                    title={`Open Emergency #${String(
+                      emergency.id
+                    ).padStart(3, "0")}`}
+                    style={{
+                      cursor: "pointer",
+                    }}
                   >
+
                     {/* ID */}
+
                     <td>
                       <strong>
                         #
-                        {String(emergency.id).padStart(
-                          3,
-                          "0"
-                        )}
+                        {String(
+                          emergency.id
+                        ).padStart(3, "0")}
                       </strong>
                     </td>
 
                     {/* PATIENT */}
+
                     <td>
                       <div className="patient-info">
+
                         <strong>
                           {emergency.patient_name ||
                             "N/A"}
                         </strong>
 
                         <span>
-                          {emergency.phone || "N/A"}
+                          {emergency.phone ||
+                            "N/A"}
                         </span>
+
                       </div>
                     </td>
 
-                    {/* EMERGENCY */}
+                    {/* EMERGENCY TYPE */}
+
                     <td>
                       {emergency.emergency_type ||
                         "N/A"}
                     </td>
 
                     {/* LOCATION */}
+
                     <td>
                       <div className="location-info">
+
                         <span>
-                          {emergency.location || "N/A"}
+                          {emergency.location ||
+                            "N/A"}
                         </span>
 
                         {emergency.latitude !==
@@ -899,14 +1086,21 @@ function Emergencies({ onNavigate }) {
                           emergency.longitude !==
                             undefined && (
                             <small>
-                              {emergency.latitude},{" "}
-                              {emergency.longitude}
+                              {
+                                emergency.latitude
+                              }
+                              ,{" "}
+                              {
+                                emergency.longitude
+                              }
                             </small>
                           )}
+
                       </div>
                     </td>
 
                     {/* SEVERITY */}
+
                     <td>
                       <span
                         className={getSeverityClass(
@@ -919,6 +1113,7 @@ function Emergencies({ onNavigate }) {
                     </td>
 
                     {/* STATUS */}
+
                     <td>
                       <span
                         className={getStatusClass(
@@ -931,10 +1126,14 @@ function Emergencies({ onNavigate }) {
                     </td>
 
                     {/* AMBULANCE */}
+
                     <td>
                       {emergency.ambulance_id ? (
                         <span>
-                          #{emergency.ambulance_id}
+                          #
+                          {
+                            emergency.ambulance_id
+                          }
                         </span>
                       ) : (
                         <span className="not-assigned">
@@ -944,10 +1143,14 @@ function Emergencies({ onNavigate }) {
                     </td>
 
                     {/* HOSPITAL */}
+
                     <td>
                       {emergency.hospital_id ? (
                         <span>
-                          #{emergency.hospital_id}
+                          #
+                          {
+                            emergency.hospital_id
+                          }
                         </span>
                       ) : (
                         <span className="not-assigned">
@@ -957,6 +1160,7 @@ function Emergencies({ onNavigate }) {
                     </td>
 
                     {/* CREATED */}
+
                     <td>
                       <span className="created-date">
                         {formatDate(
@@ -966,6 +1170,7 @@ function Emergencies({ onNavigate }) {
                     </td>
 
                     {/* ACTIONS */}
+
                     <td>
                       <div
                         style={{
@@ -974,6 +1179,9 @@ function Emergencies({ onNavigate }) {
                           gap: "7px",
                         }}
                       >
+
+                        {/* COMPLETE */}
+
                         {emergency.status !==
                         "Completed" ? (
                           <button
@@ -981,7 +1189,10 @@ function Emergencies({ onNavigate }) {
                             className="complete-button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              completeEmergency(emergency.id);
+
+                              completeEmergency(
+                                emergency.id
+                              );
                             }}
                             disabled={
                               completingId ===
@@ -1001,17 +1212,23 @@ function Emergencies({ onNavigate }) {
                           </span>
                         )}
 
+                        {/* VIEW */}
+
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            openEmergency(emergency.id);
+
+                            openEmergency(
+                              emergency.id
+                            );
                           }}
                           style={{
                             minWidth: "58px",
                             height: "30px",
                             padding: "0 10px",
-                            border: "1px solid #2563eb",
+                            border:
+                              "1px solid #2563eb",
                             borderRadius: "7px",
                             background: "#ffffff",
                             color: "#2563eb",
@@ -1023,11 +1240,16 @@ function Emergencies({ onNavigate }) {
                           View
                         </button>
 
+                        {/* DELETE */}
+
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            deleteEmergency(emergency.id);
+
+                            deleteEmergency(
+                              emergency.id
+                            );
                           }}
                           disabled={
                             deletingId ===
@@ -1048,16 +1270,14 @@ function Emergencies({ onNavigate }) {
                             fontWeight: "700",
                             cursor:
                               deletingId ===
-                              emergency.id
+                                emergency.id
                                 ? "not-allowed"
                                 : "pointer",
                             opacity:
                               deletingId ===
-                              emergency.id
+                                emergency.id
                                 ? 0.6
                                 : 1,
-                            transition:
-                              "0.2s ease",
                           }}
                         >
                           {deletingId ===
@@ -1065,19 +1285,30 @@ function Emergencies({ onNavigate }) {
                             ? "Deleting..."
                             : "Delete"}
                         </button>
+
                       </div>
                     </td>
+
                   </tr>
+
                 ))}
+
               </tbody>
+
             </table>
+
           </div>
         )}
+
       </section>
+
     </main>
   );
 }
 
+// ============================================================
+// STYLES
+// ============================================================
 
 const labelStyle = {
   display: "flex",
@@ -1109,10 +1340,10 @@ const primaryButtonStyle = {
   color: "#ffffff",
   fontSize: "13px",
   fontWeight: "700",
+  cursor: "pointer",
 };
 
 const secondaryButtonStyle = {
-  width: "100%",
   minHeight: "40px",
   padding: "0 13px",
   border: "1px solid #d1d5db",

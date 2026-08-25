@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 const API_URL = "http://127.0.0.1:8000";
 
-function CitizenDashboard({ onLogout }) {
+function CitizenDashboard({ onLogout, onNavigate }) {
   const [emergency, setEmergency] = useState(null);
   const [emergencyHistory, setEmergencyHistory] = useState([]);
 
@@ -41,6 +41,19 @@ function CitizenDashboard({ onLogout }) {
     localStorage.removeItem("emergency_id");
 
     window.location.assign("/");
+  };
+
+  // ============================================================
+  // REPORT EMERGENCY NAVIGATION
+  // ============================================================
+
+  const handleReportEmergency = () => {
+    if (typeof onNavigate === "function") {
+      onNavigate("/report-emergency");
+      return;
+    }
+
+    window.location.assign("/report-emergency");
   };
 
   // ============================================================
@@ -355,7 +368,7 @@ function CitizenDashboard({ onLogout }) {
       <main style={styles.container}>
 
         {/* ======================================================
-            PAGE TITLE
+            PAGE TITLE + ACTIONS
         ====================================================== */}
 
         <div style={styles.topRow}>
@@ -369,13 +382,55 @@ function CitizenDashboard({ onLogout }) {
             </p>
           </div>
 
-          <button
-            style={styles.secondary}
-            onClick={loadEmergency}
-          >
-            ↻ Refresh
-          </button>
+          <div style={styles.headerActions}>
+            <button
+              type="button"
+              style={styles.reportButton}
+              onClick={handleReportEmergency}
+            >
+              🚨 Report Emergency
+            </button>
+
+            <button
+              type="button"
+              style={styles.secondary}
+              onClick={loadEmergency}
+            >
+              ↻ Refresh
+            </button>
+          </div>
         </div>
+
+        {/* ======================================================
+            QUICK ACTION CARD
+        ====================================================== */}
+
+        <section style={styles.reportCard}>
+          <div style={styles.reportIcon}>
+            🚨
+          </div>
+
+          <div style={styles.reportText}>
+            <h2 style={styles.reportTitle}>
+              Need Emergency Assistance?
+            </h2>
+
+            <p style={styles.muted}>
+              Report a new emergency and let RapidResQ
+              automatically determine severity, assign the
+              nearest available ambulance, and identify a
+              hospital with an available bed.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            style={styles.reportButtonLarge}
+            onClick={handleReportEmergency}
+          >
+            Report Emergency →
+          </button>
+        </section>
 
         {/* ======================================================
             ACTIVE EMERGENCY
@@ -769,12 +824,23 @@ function CitizenDashboard({ onLogout }) {
               available below.
             </p>
 
-            <button
-              style={styles.secondary}
-              onClick={loadEmergency}
-            >
-              ↻ Refresh
-            </button>
+            <div style={styles.emptyActions}>
+              <button
+                type="button"
+                style={styles.reportButton}
+                onClick={handleReportEmergency}
+              >
+                🚨 Report Emergency
+              </button>
+
+              <button
+                type="button"
+                style={styles.secondary}
+                onClick={loadEmergency}
+              >
+                ↻ Refresh
+              </button>
+            </div>
           </section>
         )}
 
@@ -821,6 +887,14 @@ function CitizenDashboard({ onLogout }) {
                 You have not created any emergency
                 requests yet.
               </p>
+
+              <button
+                type="button"
+                style={styles.reportButton}
+                onClick={handleReportEmergency}
+              >
+                🚨 Report Your First Emergency
+              </button>
             </div>
           ) : (
             <div style={styles.historyList}>
@@ -848,6 +922,7 @@ function CitizenDashboard({ onLogout }) {
   );
 }
 
+
 // ============================================================
 // HEADER
 // ============================================================
@@ -866,6 +941,7 @@ function Header({ onLogout }) {
       </div>
 
       <button
+        type="button"
         style={styles.logout}
         onClick={onLogout}
       >
@@ -874,6 +950,7 @@ function Header({ onLogout }) {
     </header>
   );
 }
+
 
 // ============================================================
 // EMERGENCY HISTORY CARD
@@ -993,6 +1070,7 @@ function EmergencyHistoryCard({
   );
 }
 
+
 // ============================================================
 // FORMAT COORDINATES
 // ============================================================
@@ -1007,6 +1085,7 @@ function formatCoord(value) {
 
   return Number(value).toFixed(4);
 }
+
 
 // ============================================================
 // FORMAT DATE
@@ -1025,6 +1104,7 @@ function formatDate(value) {
 
   return date.toLocaleString();
 }
+
 
 // ============================================================
 // STATUS STYLE
@@ -1065,6 +1145,7 @@ function getStatusStyle(status) {
     color: "#374151",
   };
 }
+
 
 // ============================================================
 // SEVERITY STYLE
@@ -1114,6 +1195,7 @@ function getSeverityStyle(severity) {
   };
 }
 
+
 // ============================================================
 // INFO COMPONENT
 // ============================================================
@@ -1131,6 +1213,7 @@ function Info({ label, value }) {
     </div>
   );
 }
+
 
 // ============================================================
 // METRIC COMPONENT
@@ -1157,6 +1240,7 @@ function Metric({
     </div>
   );
 }
+
 
 // ============================================================
 // STYLES
@@ -1226,6 +1310,13 @@ const styles = {
     marginBottom: 20,
   },
 
+  headerActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+
   title: {
     margin: 0,
     fontSize: 30,
@@ -1247,6 +1338,66 @@ const styles = {
     marginBottom: 18,
     boxShadow:
       "0 5px 18px rgba(15,23,42,.05)",
+  },
+
+  reportCard: {
+    background: "#fff7f7",
+    border:
+      "1px solid #fecaca",
+    borderLeft:
+      "5px solid #dc2626",
+    borderRadius: 16,
+    padding: 22,
+    marginBottom: 18,
+    display: "flex",
+    alignItems: "center",
+    gap: 18,
+    flexWrap: "wrap",
+    boxShadow:
+      "0 5px 18px rgba(15,23,42,.05)",
+  },
+
+  reportIcon: {
+    width: 54,
+    height: 54,
+    display: "grid",
+    placeItems: "center",
+    borderRadius: 14,
+    background: "#fee2e2",
+    fontSize: 27,
+    flexShrink: 0,
+  },
+
+  reportText: {
+    flex: 1,
+    minWidth: 240,
+  },
+
+  reportTitle: {
+    margin: 0,
+    fontSize: 20,
+  },
+
+  reportButton: {
+    border: 0,
+    background: "#dc2626",
+    color: "#ffffff",
+    borderRadius: 9,
+    padding: "11px 17px",
+    fontWeight: 800,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+
+  reportButtonLarge: {
+    border: 0,
+    background: "#dc2626",
+    color: "#ffffff",
+    borderRadius: 9,
+    padding: "13px 18px",
+    fontWeight: 800,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
   },
 
   activeBanner: {
@@ -1414,6 +1565,15 @@ const styles = {
     textAlign: "center",
     boxShadow:
       "0 5px 18px rgba(15,23,42,.05)",
+  },
+
+  emptyActions: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 18,
   },
 
   message: {

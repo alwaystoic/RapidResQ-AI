@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import Dashboard from "./pages/Dashboard";
 import CitizenDashboard from "./pages/CitizenDashboard";
+import CitizenReportEmergency from "./pages/CitizenReportEmergency";
 import Emergencies from "./pages/Emergencies";
 import EmergencyDetails from "./pages/EmergencyDetails";
 import Ambulances from "./pages/Ambulances";
@@ -100,7 +101,9 @@ function LoginPage({ onLogin }) {
       }
 
       if (!data.access_token) {
-        setError("Login successful, but no access token was received.");
+        setError(
+          "Login successful, but no access token was received."
+        );
         return;
       }
 
@@ -577,14 +580,45 @@ function App() {
   }
 
 
-  // ==========================================================
-  // EMERGENCY DETAILS
-  // ==========================================================
+  // ============================================================
+  // CITIZEN REPORT EMERGENCY
+  // ============================================================
 
-  if (currentPath.startsWith("/emergencies/")) {
-    const emergencyId = currentPath.split("/")[2];
+  if (
+    currentPath === "/report-emergency"
+  ) {
+
+    if (
+      normalizedRole === "citizen"
+    ) {
+
+      return (
+        <CitizenReportEmergency
+          onLogout={handleLogout}
+          onNavigate={navigate}
+        />
+      );
+    }
+
+    navigate("/dashboard");
+
+    return null;
+  }
+
+
+  // ============================================================
+  // EMERGENCY DETAILS
+  // ============================================================
+
+  if (
+    currentPath.startsWith("/emergencies/")
+  ) {
+
+    const emergencyId =
+      currentPath.split("/")[2];
 
     if (emergencyId) {
+
       return (
         <EmergencyDetails
           emergencyId={emergencyId}
@@ -596,9 +630,9 @@ function App() {
   }
 
 
-  // ==========================================================
+  // ============================================================
   // EMERGENCIES
-  // ==========================================================
+  // ============================================================
 
   if (
     currentPath === "/emergencies"
@@ -613,9 +647,9 @@ function App() {
   }
 
 
-  // ==========================================================
+  // ============================================================
   // AMBULANCES
-  // ==========================================================
+  // ============================================================
 
   if (
     currentPath === "/ambulances"
@@ -630,9 +664,9 @@ function App() {
   }
 
 
-  // ==========================================================
+  // ============================================================
   // HOSPITALS
-  // ==========================================================
+  // ============================================================
 
   if (
     currentPath === "/hospitals"
@@ -647,9 +681,9 @@ function App() {
   }
 
 
-  // ==========================================================
+  // ============================================================
   // USERS
-  // ==========================================================
+  // ============================================================
 
   if (
     currentPath === "/users"
@@ -664,9 +698,9 @@ function App() {
   }
 
 
-  // ==========================================================
+  // ============================================================
   // SETTINGS
-  // ==========================================================
+  // ============================================================
 
   if (
     currentPath === "/settings"
@@ -683,9 +717,9 @@ function App() {
   }
 
 
-  // ==========================================================
+  // ============================================================
   // UNKNOWN ROUTE
-  // ==========================================================
+  // ============================================================
 
   return (
     <PlaceholderPage
