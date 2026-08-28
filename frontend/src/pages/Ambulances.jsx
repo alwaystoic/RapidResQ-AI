@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import "./Ambulances.css";
-
-const API_URL = "http://127.0.0.1:8000";
+import {
+  apiGet,
+  apiPost,
+  apiPut,
+  apiDelete,
+} from "../api";
 
 function Ambulances({ onNavigate }) {
   const [ambulances, setAmbulances] = useState([]);
@@ -19,51 +23,13 @@ function Ambulances({ onNavigate }) {
     status: "Available",
   });
 
-  const token =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("token");
-
   // ==========================================
   // FETCH AMBULANCES
   // ==========================================
 
   const fetchAmbulances = useCallback(async () => {
     try {
-      if (!token) {
-        throw new Error("Session expired. Please login again.");
-      }
-
-      const response = await fetch(`${API_URL}/ambulances`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expired. Please login again.");
-        }
-
-        if (response.status === 403) {
-          throw new Error(
-            "You do not have permission to view ambulances."
-          );
-        }
-
-        throw new Error(
-          data?.detail || "Failed to load ambulances."
-        );
-      }
-
-      // Backend can return:
-      // [ ... ]
-      //
-      // OR:
-      // { ambulances: [ ... ] }
+      const data = await apiGet("/ambulances");
 
       const ambulanceList = Array.isArray(data)
         ? data
@@ -82,15 +48,13 @@ function Ambulances({ onNavigate }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   // ==========================================
   // INITIAL LOAD
   // ==========================================
 
   useEffect(() => {
-    // Delay the async state updates until after
-    // the effect itself has completed.
     const timer = setTimeout(() => {
       fetchAmbulances();
     }, 0);
@@ -201,27 +165,31 @@ function Ambulances({ onNavigate }) {
     event.preventDefault();
 
     try {
-      if (!token) {
-        throw new Error("Session expired. Please login again.");
-      }
-
       const latitude = Number(formData.latitude);
       const longitude = Number(formData.longitude);
 
       if (!Number.isFinite(latitude)) {
-        throw new Error("Latitude must be a valid number.");
+        throw new Error(
+          "Latitude must be a valid number."
+        );
       }
 
       if (!Number.isFinite(longitude)) {
-        throw new Error("Longitude must be a valid number.");
+        throw new Error(
+          "Longitude must be a valid number."
+        );
       }
 
       if (!formData.vehicle.trim()) {
-        throw new Error("Vehicle ID is required.");
+        throw new Error(
+          "Vehicle ID is required."
+        );
       }
 
       if (!formData.location.trim()) {
-        throw new Error("Location is required.");
+        throw new Error(
+          "Location is required."
+        );
       }
 
       const payload = {
@@ -234,27 +202,15 @@ function Ambulances({ onNavigate }) {
 
       const isEditing = Boolean(editingAmbulance);
 
-      const url = isEditing
-        ? `${API_URL}/ambulances/${editingAmbulance.id}`
-        : `${API_URL}/ambulances`;
-
-      const response = await fetch(url, {
-        method: isEditing ? "PUT" : "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            `Failed to ${
-              isEditing ? "update" : "create"
-            } ambulance.`
+      if (isEditing) {
+        await apiPut(
+          `/ambulances/${editingAmbulance.id}`,
+          payload
+        );
+      } else {
+        await apiPost(
+          "/ambulances",
+          payload
         );
       }
 
@@ -262,7 +218,10 @@ function Ambulances({ onNavigate }) {
 
       await fetchAmbulances();
     } catch (err) {
-      console.error("Save ambulance error:", err);
+      console.error(
+        "Save ambulance error:",
+        err
+      );
 
       alert(
         err?.message ||
@@ -285,29 +244,9 @@ function Ambulances({ onNavigate }) {
     }
 
     try {
-      if (!token) {
-        throw new Error("Session expired. Please login again.");
-      }
-
-      const response = await fetch(
-        `${API_URL}/ambulances/${ambulance.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+      await apiDelete(
+        `/ambulances/${ambulance.id}`
       );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            "Failed to delete ambulance."
-        );
-      }
 
       setAmbulances((current) =>
         current.filter(
@@ -315,7 +254,10 @@ function Ambulances({ onNavigate }) {
         )
       );
     } catch (err) {
-      console.error("Delete ambulance error:", err);
+      console.error(
+        "Delete ambulance error:",
+        err
+      );
 
       alert(
         err?.message ||
@@ -329,7 +271,8 @@ function Ambulances({ onNavigate }) {
   // ==========================================
 
   const getStatusClass = (status) => {
-    const normalized = status?.toLowerCase();
+    const normalized =
+      status?.toLowerCase();
 
     if (normalized === "available") {
       return "available";
@@ -375,9 +318,7 @@ function Ambulances({ onNavigate }) {
   return (
     <div className="ambulances-page">
 
-      {/* =========================
-          HEADER
-      ========================= */}
+      {/* HEADER */}
 
       <header className="ambulances-header">
 
@@ -389,52 +330,37 @@ function Ambulances({ onNavigate }) {
               if (onNavigate) {
                 onNavigate("/dashboard");
               } else {
-                window.location.href = "/dashboard";
+                window.location.href =
+                  "/dashboard";
               }
             }}
           >
-            ← Dashboard
+            ←
           </button>
 
           <div>
-            <h1>Ambulances</h1>
+            <h1>Ambulance Fleet</h1>
 
             <p>
-              Manage and monitor the RapidResQ
-              ambulance fleet
+              Manage RapidResQ ambulance units
             </p>
           </div>
 
         </div>
 
-        <div className="header-actions">
-
-          <button
-            className="refresh-button"
-            onClick={fetchAmbulances}
-          >
-            ↻ Refresh
-          </button>
-
-          <button
-            className="add-ambulance-button"
-            onClick={openAddForm}
-          >
-            + Add Ambulance
-          </button>
-
-        </div>
+        <button
+          className="add-ambulance-button"
+          onClick={openAddForm}
+        >
+          + Add Ambulance
+        </button>
 
       </header>
 
-      {/* =========================
-          ERROR
-      ========================= */}
+      {/* ERROR */}
 
       {error && (
         <div className="ambulance-error">
-
-          <span>⚠️</span>
 
           <div>
             <strong>
@@ -444,16 +370,19 @@ function Ambulances({ onNavigate }) {
             <p>{error}</p>
           </div>
 
-          <button onClick={fetchAmbulances}>
+          <button
+            onClick={() => {
+              setLoading(true);
+              fetchAmbulances();
+            }}
+          >
             Try Again
           </button>
 
         </div>
       )}
 
-      {/* =========================
-          STATISTICS
-      ========================= */}
+      {/* STATISTICS */}
 
       <section className="ambulance-stats">
 
@@ -466,6 +395,7 @@ function Ambulances({ onNavigate }) {
           <div>
             <span>Total Fleet</span>
             <strong>{total}</strong>
+
             <small>
               Registered ambulances
             </small>
@@ -482,6 +412,7 @@ function Ambulances({ onNavigate }) {
           <div>
             <span>Available</span>
             <strong>{available}</strong>
+
             <small>
               Ready for dispatch
             </small>
@@ -498,6 +429,7 @@ function Ambulances({ onNavigate }) {
           <div>
             <span>Busy</span>
             <strong>{busy}</strong>
+
             <small>
               Currently assigned
             </small>
@@ -514,6 +446,7 @@ function Ambulances({ onNavigate }) {
           <div>
             <span>Maintenance</span>
             <strong>{maintenance}</strong>
+
             <small>
               Unavailable for service
             </small>
@@ -523,9 +456,7 @@ function Ambulances({ onNavigate }) {
 
       </section>
 
-      {/* =========================
-          FLEET TABLE
-      ========================= */}
+      {/* FLEET TABLE */}
 
       <section className="fleet-card">
 
@@ -588,124 +519,131 @@ function Ambulances({ onNavigate }) {
 
               <tbody>
 
-                {ambulances.map((ambulance) => (
+                {ambulances.map(
+                  (ambulance) => (
 
-                  <tr key={ambulance.id}>
+                    <tr
+                      key={ambulance.id}
+                    >
 
-                    <td>
-                      <span className="ambulance-id">
-                        #
-                        {String(
-                          ambulance.id
-                        ).padStart(3, "0")}
-                      </span>
-                    </td>
+                      <td>
+                        <span className="ambulance-id">
+                          #
+                          {String(
+                            ambulance.id
+                          ).padStart(
+                            3,
+                            "0"
+                          )}
+                        </span>
+                      </td>
 
-                    <td>
+                      <td>
 
-                      <div className="vehicle-cell">
+                        <div className="vehicle-cell">
 
-                        <div className="vehicle-icon">
-                          🚑
+                          <div className="vehicle-icon">
+                            🚑
+                          </div>
+
+                          <div>
+
+                            <strong>
+                              {ambulance.vehicle}
+                            </strong>
+
+                            <small>
+                              Ambulance Unit
+                            </small>
+
+                          </div>
+
                         </div>
 
-                        <div>
+                      </td>
 
-                          <strong>
-                            {ambulance.vehicle}
-                          </strong>
+                      <td>
 
-                          <small>
-                            Ambulance Unit
-                          </small>
+                        <div className="location-cell">
+
+                          <span>📍</span>
+
+                          <span>
+                            {ambulance.location ||
+                              "Unknown"}
+                          </span>
 
                         </div>
 
-                      </div>
+                      </td>
 
-                    </td>
+                      <td>
 
-                    <td>
+                        <span
+                          className={`status-badge ${getStatusClass(
+                            ambulance.status
+                          )}`}
+                        >
 
-                      <div className="location-cell">
+                          <span className="status-dot"></span>
 
-                        <span>📍</span>
-
-                        <span>
-                          {ambulance.location ||
+                          {ambulance.status ||
                             "Unknown"}
+
                         </span>
 
-                      </div>
+                      </td>
 
-                    </td>
+                      <td>
 
-                    <td>
+                        <div className="coordinates">
 
-                      <span
-                        className={`status-badge ${getStatusClass(
-                          ambulance.status
-                        )}`}
-                      >
+                          <span>
+                            {ambulance.latitude}
+                          </span>
 
-                        <span className="status-dot"></span>
+                          <span>
+                            {ambulance.longitude}
+                          </span>
 
-                        {ambulance.status ||
-                          "Unknown"}
+                        </div>
 
-                      </span>
+                      </td>
 
-                    </td>
+                      <td>
 
-                    <td>
+                        <div className="action-buttons">
 
-                      <div className="coordinates">
+                          <button
+                            className="edit-button"
+                            onClick={() =>
+                              openEditForm(
+                                ambulance
+                              )
+                            }
+                          >
+                            Edit
+                          </button>
 
-                        <span>
-                          {ambulance.latitude}
-                        </span>
+                          <button
+                            className="delete-button"
+                            onClick={() =>
+                              handleDelete(
+                                ambulance
+                              )
+                            }
+                          >
+                            Delete
+                          </button>
 
-                        <span>
-                          {ambulance.longitude}
-                        </span>
+                        </div>
 
-                      </div>
+                      </td>
 
-                    </td>
+                    </tr>
 
-                    <td>
-
-                      <div className="action-buttons">
-
-                        <button
-                          className="edit-button"
-                          onClick={() =>
-                            openEditForm(
-                              ambulance
-                            )
-                          }
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          className="delete-button"
-                          onClick={() =>
-                            handleDelete(
-                              ambulance
-                            )
-                          }
-                        >
-                          Delete
-                        </button>
-
-                      </div>
-
-                    </td>
-
-                  </tr>
-
-                ))}
+                  )
+                )}
 
               </tbody>
 
@@ -717,9 +655,7 @@ function Ambulances({ onNavigate }) {
 
       </section>
 
-      {/* =========================
-          ADD / EDIT MODAL
-      ========================= */}
+      {/* ADD / EDIT MODAL */}
 
       {showForm && (
 

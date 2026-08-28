@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { apiPost } from "./api";
+
 import Dashboard from "./pages/Dashboard";
 import CitizenDashboard from "./pages/CitizenDashboard";
 import CitizenReportEmergency from "./pages/CitizenReportEmergency";
@@ -10,7 +12,6 @@ import Hospital from "./pages/Hospital";
 import Users from "./pages/Users";
 
 import "./App.css";
-
 
 // ============================================================
 // JWT ROLE HELPER
@@ -46,7 +47,6 @@ function getRoleFromToken(token) {
   }
 }
 
-
 // ============================================================
 // LOGIN PAGE
 // ============================================================
@@ -56,7 +56,6 @@ function LoginPage({ onLogin }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
 
   // ==========================================================
   // LOGIN
@@ -69,38 +68,12 @@ function LoginPage({ onLogin }) {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/auth/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-          }),
-        }
-      );
+      const data = await apiPost("/auth/login", {
+        email,
+        password,
+      });
 
-      let data;
-
-      try {
-        data = await response.json();
-      } catch {
-        data = {};
-      }
-
-      if (!response.ok) {
-        setError(
-          data.detail ||
-            data.message ||
-            "Invalid email or password."
-        );
-        return;
-      }
-
-      if (!data.access_token) {
+      if (!data?.access_token) {
         setError(
           "Login successful, but no access token was received."
         );
@@ -144,18 +117,17 @@ function LoginPage({ onLogin }) {
         ...data,
         role,
       });
-
     } catch (err) {
       console.error("Login error:", err);
 
       setError(
-        "Unable to connect to RapidResQ server. Make sure the backend is running."
+        err?.message ||
+          "Unable to connect to RapidResQ server. Make sure the backend is running."
       );
     } finally {
       setLoading(false);
     }
   };
-
 
   // ==========================================================
   // LOGIN UI
@@ -163,12 +135,10 @@ function LoginPage({ onLogin }) {
 
   return (
     <div className="login-page">
-
       <div className="login-card">
 
         {/* Logo */}
         <div className="login-logo">
-
           <div className="login-logo-icon">
             +
           </div>
@@ -177,21 +147,16 @@ function LoginPage({ onLogin }) {
             <h1>RapidResQ</h1>
             <p>Emergency Response System</p>
           </div>
-
         </div>
-
 
         {/* Heading */}
         <div className="login-heading">
-
           <h2>Welcome back</h2>
 
           <p>
             Sign in to your RapidResQ account
           </p>
-
         </div>
-
 
         {/* Error */}
         {error && (
@@ -200,13 +165,11 @@ function LoginPage({ onLogin }) {
           </div>
         )}
 
-
         {/* Login Form */}
         <form onSubmit={handleSubmit}>
 
           {/* Email */}
           <div className="login-field">
-
             <label htmlFor="login-email">
               Email
             </label>
@@ -222,13 +185,10 @@ function LoginPage({ onLogin }) {
               autoComplete="email"
               required
             />
-
           </div>
-
 
           {/* Password */}
           <div className="login-field login-password-field">
-
             <label htmlFor="login-password">
               Password
             </label>
@@ -244,9 +204,7 @@ function LoginPage({ onLogin }) {
               autoComplete="current-password"
               required
             />
-
           </div>
-
 
           {/* Login Button */}
           <button
@@ -260,9 +218,7 @@ function LoginPage({ onLogin }) {
               ? "Signing in..."
               : "Sign In"}
           </button>
-
         </form>
-
 
         {/* Footer */}
         <p className="login-footer">
@@ -270,11 +226,9 @@ function LoginPage({ onLogin }) {
         </p>
 
       </div>
-
     </div>
   );
 }
-
 
 // ============================================================
 // PLACEHOLDER PAGE
@@ -315,7 +269,6 @@ function PlaceholderPage({
   );
 }
 
-
 // ============================================================
 // MAIN APP
 // ============================================================
@@ -329,7 +282,6 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
     () => !!localStorage.getItem("access_token")
   );
-
 
   // ==========================================================
   // USER ROLE
@@ -360,7 +312,6 @@ function App() {
     return tokenRole;
   });
 
-
   // ==========================================================
   // CURRENT ROUTE
   // ==========================================================
@@ -369,7 +320,6 @@ function App() {
     useState(
       window.location.pathname
     );
-
 
   // ==========================================================
   // BROWSER NAVIGATION
@@ -397,7 +347,6 @@ function App() {
 
   }, []);
 
-
   // ==========================================================
   // NAVIGATION
   // ==========================================================
@@ -416,7 +365,6 @@ function App() {
 
     setCurrentPath(path);
   };
-
 
   // ==========================================================
   // LOGIN
@@ -452,7 +400,6 @@ function App() {
 
     setIsLoggedIn(true);
 
-
     // Citizen dashboard
     if (
       role.toLowerCase() === "citizen"
@@ -461,11 +408,9 @@ function App() {
       return;
     }
 
-
     // Admin / other staff dashboard
     navigate("/dashboard");
   };
-
 
   // ==========================================================
   // LOGOUT
@@ -491,13 +436,11 @@ function App() {
     navigate("/");
   };
 
-
   // ==========================================================
   // NOT LOGGED IN
   // ==========================================================
 
   if (!isLoggedIn) {
-
     return (
       <LoginPage
         onLogin={handleLogin}
@@ -505,14 +448,12 @@ function App() {
     );
   }
 
-
   // ==========================================================
   // NORMALIZE ROLE
   // ==========================================================
 
   const normalizedRole =
     userRole.toLowerCase();
-
 
   // ==========================================================
   // CITIZEN DASHBOARD
@@ -526,7 +467,6 @@ function App() {
       currentPath === "/citizen-dashboard"
     )
   ) {
-
     return (
       <CitizenDashboard
         onLogout={handleLogout}
@@ -534,7 +474,6 @@ function App() {
       />
     );
   }
-
 
   // ==========================================================
   // ADMIN / STAFF DASHBOARD
@@ -544,7 +483,6 @@ function App() {
     currentPath === "/" ||
     currentPath === "/dashboard"
   ) {
-
     return (
       <Dashboard
         onLogout={handleLogout}
@@ -553,10 +491,9 @@ function App() {
     );
   }
 
-
-  // ==========================================================
+  // ============================================================
   // CITIZEN DASHBOARD DIRECT ROUTE
-  // ==========================================================
+  // ============================================================
 
   if (
     currentPath === "/citizen-dashboard"
@@ -565,7 +502,6 @@ function App() {
     if (
       normalizedRole === "citizen"
     ) {
-
       return (
         <CitizenDashboard
           onLogout={handleLogout}
@@ -579,7 +515,6 @@ function App() {
     return null;
   }
 
-
   // ============================================================
   // CITIZEN REPORT EMERGENCY
   // ============================================================
@@ -591,7 +526,6 @@ function App() {
     if (
       normalizedRole === "citizen"
     ) {
-
       return (
         <CitizenReportEmergency
           onLogout={handleLogout}
@@ -605,7 +539,6 @@ function App() {
     return null;
   }
 
-
   // ============================================================
   // EMERGENCY DETAILS
   // ============================================================
@@ -618,7 +551,6 @@ function App() {
       currentPath.split("/")[2];
 
     if (emergencyId) {
-
       return (
         <EmergencyDetails
           emergencyId={emergencyId}
@@ -629,7 +561,6 @@ function App() {
     }
   }
 
-
   // ============================================================
   // EMERGENCIES
   // ============================================================
@@ -637,7 +568,6 @@ function App() {
   if (
     currentPath === "/emergencies"
   ) {
-
     return (
       <Emergencies
         onLogout={handleLogout}
@@ -646,7 +576,6 @@ function App() {
     );
   }
 
-
   // ============================================================
   // AMBULANCES
   // ============================================================
@@ -654,7 +583,6 @@ function App() {
   if (
     currentPath === "/ambulances"
   ) {
-
     return (
       <Ambulances
         onLogout={handleLogout}
@@ -663,7 +591,6 @@ function App() {
     );
   }
 
-
   // ============================================================
   // HOSPITALS
   // ============================================================
@@ -671,7 +598,6 @@ function App() {
   if (
     currentPath === "/hospitals"
   ) {
-
     return (
       <Hospital
         onLogout={handleLogout}
@@ -680,7 +606,6 @@ function App() {
     );
   }
 
-
   // ============================================================
   // USERS
   // ============================================================
@@ -688,7 +613,6 @@ function App() {
   if (
     currentPath === "/users"
   ) {
-
     return (
       <Users
         onLogout={handleLogout}
@@ -697,7 +621,6 @@ function App() {
     );
   }
 
-
   // ============================================================
   // SETTINGS
   // ============================================================
@@ -705,7 +628,6 @@ function App() {
   if (
     currentPath === "/settings"
   ) {
-
     return (
       <PlaceholderPage
         title="Settings"
@@ -715,7 +637,6 @@ function App() {
       />
     );
   }
-
 
   // ============================================================
   // UNKNOWN ROUTE
@@ -730,6 +651,5 @@ function App() {
     />
   );
 }
-
 
 export default App;

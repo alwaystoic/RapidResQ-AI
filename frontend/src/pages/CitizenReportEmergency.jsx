@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiPost } from "../api";
 import "./CitizenReportEmergency.css";
 
 function CitizenReportEmergency({ onNavigate, onLogout }) {
@@ -12,6 +13,10 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
   const [gettingLocation, setGettingLocation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // ==========================================================
+  // GET CURRENT LOCATION
+  // ==========================================================
 
   const getCurrentLocation = () => {
     setError("");
@@ -50,6 +55,10 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
     );
   };
 
+  // ==========================================================
+  // SUBMIT EMERGENCY
+  // ==========================================================
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -60,7 +69,9 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
       return;
     }
 
-    const token = localStorage.getItem("access_token");
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token");
 
     if (!token) {
       setError("Your session has expired. Please log in again.");
@@ -70,34 +81,14 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
     setSubmitting(true);
 
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/emergencies",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            patient_name: patientName,
-            phone: phone,
-            emergency_type: emergencyType,
-            location: location,
-            latitude: Number(latitude),
-            longitude: Number(longitude),
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(
-          data.detail ||
-            "Unable to create emergency. Please try again."
-        );
-        return;
-      }
+      const data = await apiPost("/emergencies", {
+        patient_name: patientName,
+        phone: phone,
+        emergency_type: emergencyType,
+        location: location,
+        latitude: Number(latitude),
+        longitude: Number(longitude),
+      });
 
       console.log("Emergency created successfully:", data);
 
@@ -108,7 +99,7 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
        * Store it so the Citizen Dashboard can display
        * the newly created emergency.
        */
-      if (data.data?.id) {
+      if (data?.data?.id) {
         localStorage.setItem(
           "citizen_emergency_id",
           String(data.data.id)
@@ -116,14 +107,15 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
       }
 
       // Return to Citizen Dashboard
-      if (onNavigate) {
+      if (typeof onNavigate === "function") {
         onNavigate("/citizen-dashboard");
       }
     } catch (err) {
       console.error("Emergency submission error:", err);
 
       setError(
-        "Unable to connect to RapidResQ server. Make sure the backend is running."
+        err?.message ||
+          "Unable to connect to RapidResQ server. Make sure the backend is running."
       );
     } finally {
       setSubmitting(false);
@@ -132,13 +124,15 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
 
   return (
     <div className="citizen-report-page">
-
       {/* HEADER */}
       <header className="citizen-report-header">
-
         <div
           className="citizen-report-brand"
-          onClick={() => onNavigate("/citizen-dashboard")}
+          onClick={() => {
+            if (typeof onNavigate === "function") {
+              onNavigate("/citizen-dashboard");
+            }
+          }}
         >
           <div className="citizen-report-logo">+</div>
 
@@ -149,77 +143,70 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
         </div>
 
         <div className="citizen-report-header-actions">
-
           <button
             className="citizen-back-button"
-            onClick={() => onNavigate("/citizen-dashboard")}
+            type="button"
+            onClick={() => {
+              if (typeof onNavigate === "function") {
+                onNavigate("/citizen-dashboard");
+              }
+            }}
           >
-            ← Dashboard
+            ← Back to Dashboard
           </button>
 
           <button
             className="citizen-logout-button"
-            onClick={onLogout}
+            type="button"
+            onClick={() => {
+              if (typeof onLogout === "function") {
+                onLogout();
+              }
+            }}
           >
             Logout
           </button>
-
         </div>
-
       </header>
 
-
-      {/* MAIN CONTENT */}
-      <main className="citizen-report-main">
-
-        <div className="citizen-report-title">
-
-          <div>
-            <div className="danger-icon">🚨</div>
-
-            <h2>Report an Emergency</h2>
-
-            <p>
-              Provide the emergency details below. Our response
-              system will automatically find the nearest available
-              ambulance and hospital.
-            </p>
-          </div>
-
+      <main className="citizen-report-content">
+        {/* PAGE HEADING */}
+        <div className="citizen-report-heading">
+          <h2>Report an Emergency</h2>
+          <p>
+            Provide the details below so emergency assistance can be
+            dispatched quickly.
+          </p>
         </div>
-
 
         {/* ERROR */}
         {error && (
           <div className="citizen-report-error">
-            ⚠️ {error}
+            <span>⚠️</span>
+            <div>{error}</div>
           </div>
         )}
-
 
         {/* FORM */}
         <form
           className="citizen-report-card"
           onSubmit={handleSubmit}
         >
-
           {/* PATIENT INFORMATION */}
           <section className="report-section">
-
             <div className="section-heading">
               <span>👤</span>
 
               <div>
                 <h3>Patient Information</h3>
-                <p>Enter the details of the person requiring assistance.</p>
+                <p>
+                  Enter the details of the person requiring assistance.
+                </p>
               </div>
             </div>
 
-
             <div className="form-grid">
-
               <div className="form-group">
-
                 <label htmlFor="patientName">
                   Patient Name
                 </label>
@@ -234,12 +221,9 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                   placeholder="Enter patient name"
                   required
                 />
-
               </div>
 
-
               <div className="form-group">
-
                 <label htmlFor="phone">
                   Phone Number
                 </label>
@@ -254,29 +238,24 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                   placeholder="Enter phone number"
                   required
                 />
-
               </div>
-
             </div>
-
           </section>
-
 
           {/* EMERGENCY INFORMATION */}
           <section className="report-section">
-
             <div className="section-heading">
-              <span>🏥</span>
+              <span>🥵</span>
 
               <div>
                 <h3>Emergency Information</h3>
-                <p>Tell us what type of emergency has occurred.</p>
+                <p>
+                  Tell us what type of emergency has occurred.
+                </p>
               </div>
             </div>
 
-
             <div className="form-group">
-
               <label htmlFor="emergencyType">
                 Emergency Type
               </label>
@@ -317,29 +296,24 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                   Other
                 </option>
               </select>
-
             </div>
-
           </section>
-
 
           {/* LOCATION */}
           <section className="report-section">
-
             <div className="section-heading">
               <span>📍</span>
 
               <div>
                 <h3>Emergency Location</h3>
+
                 <p>
                   Provide the location where assistance is required.
                 </p>
               </div>
             </div>
 
-
             <div className="form-group">
-
               <label htmlFor="location">
                 Location
               </label>
@@ -354,14 +328,10 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                 placeholder="Enter location / landmark"
                 required
               />
-
             </div>
 
-
             <div className="coordinates-grid">
-
               <div className="form-group">
-
                 <label htmlFor="latitude">
                   Latitude
                 </label>
@@ -377,12 +347,9 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                   placeholder="18.xxxxxx"
                   required
                 />
-
               </div>
 
-
               <div className="form-group">
-
                 <label htmlFor="longitude">
                   Longitude
                 </label>
@@ -398,11 +365,8 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                   placeholder="73.xxxxxx"
                   required
                 />
-
               </div>
-
             </div>
-
 
             <button
               type="button"
@@ -414,13 +378,10 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                 ? "📍 Getting Location..."
                 : "📍 Use My Current Location"}
             </button>
-
           </section>
-
 
           {/* SUBMIT */}
           <div className="report-submit-section">
-
             <div className="submit-warning">
               <span>⚠️</span>
 
@@ -429,7 +390,6 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                 immediate assistance is required.
               </p>
             </div>
-
 
             <button
               type="submit"
@@ -440,13 +400,9 @@ function CitizenReportEmergency({ onNavigate, onLogout }) {
                 ? "🚑 Processing Emergency..."
                 : "🚨 REQUEST EMERGENCY ASSISTANCE"}
             </button>
-
           </div>
-
         </form>
-
       </main>
-
     </div>
   );
 }

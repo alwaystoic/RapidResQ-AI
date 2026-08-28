@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { apiDelete, apiGet, apiPost, apiPut } from "../api";
 import "./Users.css";
 
-const API_URL = "http://127.0.0.1:8000";
 
 function Users() {
   const [users, setUsers] = useState([]);
@@ -39,24 +39,6 @@ function Users() {
   // HELPERS
   // =========================================================
 
-  const getToken = () => {
-    return localStorage.getItem("access_token");
-  };
-
-  const getErrorMessage = (data, fallback) => {
-    if (Array.isArray(data?.detail)) {
-      return data.detail
-        .map((item) => item.msg || "Validation error")
-        .join(", ");
-    }
-
-    if (typeof data?.detail === "string") {
-      return data.detail;
-    }
-
-    return fallback;
-  };
-
   // =========================================================
   // NAVIGATION
   // =========================================================
@@ -69,30 +51,17 @@ function Users() {
   // FETCH USERS
   // =========================================================
 
-  const fetchUsers = async () => {
-    const token = getToken();
+  const fetchUsers = useCallback(async () => {
+    const data = await apiGet("/users");
 
-    if (!token) {
-      throw new Error("You are not logged in.");
-    }
-
-    const response = await fetch(`${API_URL}/users`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        getErrorMessage(data, "Failed to load users.")
-      );
-    }
-
-    return data.users || [];
-  };
+    return Array.isArray(data)
+      ? data
+      : Array.isArray(data?.users)
+        ? data.users
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+  }, []);
 
   // =========================================================
   // INITIAL LOAD
@@ -129,7 +98,7 @@ function Users() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fetchUsers]);
 
   // =========================================================
   // REFRESH
@@ -200,12 +169,6 @@ function Users() {
       setCreatingUser(true);
       setError("");
 
-      const token = getToken();
-
-      if (!token) {
-        throw new Error("You are not logged in.");
-      }
-
       if (!addForm.full_name.trim()) {
         throw new Error("Full name is required.");
       }
@@ -222,29 +185,14 @@ function Users() {
         throw new Error("Password is required.");
       }
 
-      const response = await fetch(`${API_URL}/users`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          full_name: addForm.full_name.trim(),
-          email: addForm.email.trim(),
-          phone: addForm.phone.trim(),
-          password: addForm.password,
-          role: addForm.role,
-          status: addForm.status,
-        }),
+      const data = await apiPost("/users", {
+        full_name: addForm.full_name.trim(),
+        email: addForm.email.trim(),
+        phone: addForm.phone.trim(),
+        password: addForm.password,
+        role: addForm.role,
+        status: addForm.status,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          getErrorMessage(data, "Failed to create user.")
-        );
-      }
 
       if (data.data) {
         setUsers((previousUsers) => [
@@ -318,12 +266,6 @@ function Users() {
       setSavingUser(true);
       setError("");
 
-      const token = getToken();
-
-      if (!token) {
-        throw new Error("You are not logged in.");
-      }
-
       if (!editForm.full_name.trim()) {
         throw new Error("Full name is required.");
       }
@@ -350,32 +292,17 @@ function Users() {
         );
       }
 
-      const response = await fetch(
-        `${API_URL}/users/${editingUser.id}`,
+      const data = await apiPut(
+        `/users/${editingUser.id}`,
         {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            full_name: editForm.full_name.trim(),
-            email: editForm.email.trim(),
-            phone: editForm.phone.trim(),
-            password: editForm.password,
-            role: editForm.role,
-            status: editForm.status,
-          }),
+          full_name: editForm.full_name.trim(),
+          email: editForm.email.trim(),
+          phone: editForm.phone.trim(),
+          password: editForm.password,
+          role: editForm.role,
+          status: editForm.status,
         }
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          getErrorMessage(data, "Failed to update user.")
-        );
-      }
 
       if (data.data) {
         setUsers((previousUsers) =>
@@ -416,29 +343,9 @@ function Users() {
       setDeletingId(user.id);
       setError("");
 
-      const token = getToken();
-
-      if (!token) {
-        throw new Error("You are not logged in.");
-      }
-
-      const response = await fetch(
-        `${API_URL}/users/${user.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      const data = await apiDelete(
+        `/users/${user.id}`
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          getErrorMessage(data, "Failed to delete user.")
-        );
-      }
 
       setUsers((previousUsers) =>
         previousUsers.filter(
