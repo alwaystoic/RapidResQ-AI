@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import "./Dashboard.css";
-
-const API_URL = "http://127.0.0.1:8000";
+import { apiGet } from "../api";
 
 function Dashboard() {
   const [dashboardData, setDashboardData] = useState(null);
@@ -34,72 +33,29 @@ function Dashboard() {
   // FETCH DASHBOARD DATA
   // =========================
 
-  const fetchDashboard = useCallback(
-    async (isRefresh = false) => {
-      try {
-        if (isRefresh) {
-          setRefreshing(true);
-          setError("");
-        }
-
-        const token =
-          localStorage.getItem("access_token") ||
-          localStorage.getItem("token");
-
-        if (!token) {
-          throw new Error(
-            "No authentication token found. Please login again."
-          );
-        }
-
-        const response = await fetch(
-          `${API_URL}/dashboard/admin`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        const data = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            throw new Error(
-              "Session expired. Please login again."
-            );
-          }
-
-          if (response.status === 403) {
-            throw new Error(
-              "You do not have permission to access this dashboard."
-            );
-          }
-
-          throw new Error(
-            data?.detail ||
-              "Failed to load dashboard data."
-          );
-        }
-
-        setDashboardData(data);
+  const fetchDashboard = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
         setError("");
-      } catch (err) {
-        console.error("Dashboard error:", err);
-
-        setError(
-          err?.message ||
-            "Unable to load dashboard data."
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
       }
-    },
-    []
-  );
+
+      const data = await apiGet("/dashboard/admin");
+
+      setDashboardData(data);
+      setError("");
+    } catch (err) {
+      console.error("Dashboard error:", err);
+
+      setError(
+        err?.message ||
+          "Unable to load dashboard data."
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   // =========================
   // INITIAL LOAD

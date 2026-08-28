@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import "./Emergencies.css";
-
-const API_URL = "http://127.0.0.1:8000";
+import {
+  apiGet,
+  apiPost,
+  apiPut,
+  apiDelete,
+} from "../api";
 
 function Emergencies() {
   const [emergencies, setEmergencies] = useState([]);
@@ -11,7 +15,8 @@ function Emergencies() {
   const [deletingId, setDeletingId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateForm, setShowCreateForm] =
+    useState(false);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -26,17 +31,6 @@ function Emergencies() {
   });
 
   // ============================================================
-  // TOKEN
-  // ============================================================
-
-  const getToken = () => {
-    return (
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("token")
-    );
-  };
-
-  // ============================================================
   // NAVIGATION
   // ============================================================
 
@@ -44,16 +38,6 @@ function Emergencies() {
     window.location.assign("/dashboard");
   };
 
-  /*
-   * IMPORTANT:
-   * Use direct browser navigation here instead of relying on
-   * the App.jsx onNavigate callback.
-   *
-   * This guarantees:
-   * /emergencies
-   *      ->
-   * /emergencies/28
-   */
   const openEmergency = (emergencyId) => {
     if (
       emergencyId === null ||
@@ -63,7 +47,9 @@ function Emergencies() {
       return;
     }
 
-    window.location.assign(`/emergencies/${emergencyId}`);
+    window.location.assign(
+      `/emergencies/${emergencyId}`
+    );
   };
 
   // ============================================================
@@ -71,37 +57,7 @@ function Emergencies() {
   // ============================================================
 
   const fetchEmergencies = useCallback(async () => {
-    const token = getToken();
-
-    if (!token) {
-      throw new Error("You are not logged in.");
-    }
-
-    const response = await fetch(`${API_URL}/emergencies`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error("Session expired. Please login again.");
-      }
-
-      if (response.status === 403) {
-        throw new Error(
-          "You do not have permission to view emergencies."
-        );
-      }
-
-      throw new Error(
-        data?.detail || "Failed to load emergencies."
-      );
-    }
+    const data = await apiGet("/emergencies");
 
     if (Array.isArray(data)) {
       return data;
@@ -132,7 +88,10 @@ function Emergencies() {
           setEmergencies(data);
         }
       } catch (err) {
-        console.error("Emergency fetch error:", err);
+        console.error(
+          "Emergency fetch error:",
+          err
+        );
 
         if (!cancelled) {
           setError(
@@ -168,7 +127,10 @@ function Emergencies() {
 
       setEmergencies(data);
     } catch (err) {
-      console.error("Emergency refresh error:", err);
+      console.error(
+        "Emergency refresh error:",
+        err
+      );
 
       setError(
         err instanceof Error
@@ -181,7 +143,7 @@ function Emergencies() {
   };
 
   // ============================================================
-  // CREATE FORM
+  // FORM
   // ============================================================
 
   const handleFormChange = (event) => {
@@ -214,6 +176,10 @@ function Emergencies() {
     });
   };
 
+  // ============================================================
+  // CURRENT LOCATION
+  // ============================================================
+
   const useCurrentLocation = () => {
     setFormError("");
 
@@ -228,8 +194,10 @@ function Emergencies() {
       (position) => {
         setForm((current) => ({
           ...current,
-          latitude: position.coords.latitude.toFixed(6),
-          longitude: position.coords.longitude.toFixed(6),
+          latitude:
+            position.coords.latitude.toFixed(6),
+          longitude:
+            position.coords.longitude.toFixed(6),
         }));
       },
       () => {
@@ -259,10 +227,17 @@ function Emergencies() {
     setFormError("");
     setError("");
 
-    const patientName = form.patient_name.trim();
-    const phone = form.phone.trim();
-    const emergencyType = form.emergency_type.trim();
-    const location = form.location.trim();
+    const patientName =
+      form.patient_name.trim();
+
+    const phone =
+      form.phone.trim();
+
+    const emergencyType =
+      form.emergency_type.trim();
+
+    const location =
+      form.location.trim();
 
     const latitude = Number(form.latitude);
     const longitude = Number(form.longitude);
@@ -276,7 +251,9 @@ function Emergencies() {
       form.latitude.trim() === "" ||
       form.longitude.trim() === ""
     ) {
-      setFormError("Please fill in all fields.");
+      setFormError(
+        "Please fill in all fields."
+      );
       return;
     }
 
@@ -290,63 +267,18 @@ function Emergencies() {
       return;
     }
 
-    const token = getToken();
-
-    if (!token) {
-      setFormError("You are not logged in.");
-      return;
-    }
-
     try {
       setCreating(true);
 
-      const response = await fetch(`${API_URL}/emergencies`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          patient_name: patientName,
-          phone,
-          emergency_type: emergencyType,
-          location,
-          severity: form.severity,
-          latitude,
-          longitude,
-        }),
+      await apiPost("/emergencies", {
+        patient_name: patientName,
+        phone,
+        emergency_type: emergencyType,
+        location,
+        severity: form.severity,
+        latitude,
+        longitude,
       });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        let message = "Failed to create emergency.";
-
-        if (Array.isArray(data?.detail)) {
-          message = data.detail
-            .map((item) => {
-              if (typeof item === "string") {
-                return item;
-              }
-
-              const field = Array.isArray(item?.loc)
-                ? item.loc[item.loc.length - 1]
-                : "field";
-
-              return `${field}: ${
-                item?.msg || "Invalid value"
-              }`;
-            })
-            .join(" | ");
-        } else if (typeof data?.detail === "string") {
-          message = data.detail;
-        } else if (typeof data?.message === "string") {
-          message = data.message;
-        }
-
-        throw new Error(message);
-      }
 
       const updatedEmergencies =
         await fetchEmergencies();
@@ -355,7 +287,10 @@ function Emergencies() {
 
       closeCreateForm();
     } catch (err) {
-      console.error("Create emergency error:", err);
+      console.error(
+        "Create emergency error:",
+        err
+      );
 
       setFormError(
         err instanceof Error
@@ -371,36 +306,16 @@ function Emergencies() {
   // COMPLETE EMERGENCY
   // ============================================================
 
-  const completeEmergency = async (emergencyId) => {
+  const completeEmergency = async (
+    emergencyId
+  ) => {
     try {
       setCompletingId(emergencyId);
       setError("");
 
-      const token = getToken();
-
-      if (!token) {
-        throw new Error("You are not logged in.");
-      }
-
-      const response = await fetch(
-        `${API_URL}/emergencies/${emergencyId}/complete`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
+      await apiPut(
+        `/emergencies/${emergencyId}/complete`
       );
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            "Failed to complete emergency."
-        );
-      }
 
       const updatedEmergencies =
         await fetchEmergencies();
@@ -426,11 +341,16 @@ function Emergencies() {
   // DELETE EMERGENCY
   // ============================================================
 
-  const deleteEmergency = async (emergencyId) => {
+  const deleteEmergency = async (
+    emergencyId
+  ) => {
     const confirmed = window.confirm(
       `Are you sure you want to delete Emergency #${String(
         emergencyId
-      ).padStart(3, "0")}?\n\nThis action cannot be undone.`
+      ).padStart(
+        3,
+        "0"
+      )}?\n\nThis action cannot be undone.`
     );
 
     if (!confirmed) {
@@ -441,31 +361,9 @@ function Emergencies() {
       setDeletingId(emergencyId);
       setError("");
 
-      const token = getToken();
-
-      if (!token) {
-        throw new Error("You are not logged in.");
-      }
-
-      const response = await fetch(
-        `${API_URL}/emergencies/${emergencyId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        }
+      await apiDelete(
+        `/emergencies/${emergencyId}`
       );
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            "Failed to delete emergency."
-        );
-      }
 
       setEmergencies((current) =>
         current.filter(
@@ -578,9 +476,7 @@ function Emergencies() {
   return (
     <main className="emergencies-main">
 
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
+      {/* HEADER */}
 
       <header className="emergencies-header">
         <div>
@@ -628,7 +524,8 @@ function Emergencies() {
             style={{
               minHeight: "38px",
               padding: "0 14px",
-              border: "1px solid #d1d5db",
+              border:
+                "1px solid #d1d5db",
               borderRadius: "7px",
               background: "#ffffff",
               color: "#374151",
@@ -639,7 +536,9 @@ function Emergencies() {
               opacity: refreshing ? 0.6 : 1,
             }}
           >
-            {refreshing ? "Refreshing..." : "↻ Refresh"}
+            {refreshing
+              ? "Refreshing..."
+              : "↻ Refresh"}
           </button>
 
           <button
@@ -655,16 +554,15 @@ function Emergencies() {
         </div>
       </header>
 
-      {/* =====================================================
-          ERROR
-      ====================================================== */}
+      {/* ERROR */}
 
       {error && (
         <div
           style={{
             margin: "0 22px 15px",
             padding: "12px 14px",
-            border: "1px solid #fecaca",
+            border:
+              "1px solid #fecaca",
             borderRadius: "8px",
             background: "#fef2f2",
             color: "#b91c1c",
@@ -676,9 +574,7 @@ function Emergencies() {
         </div>
       )}
 
-      {/* =====================================================
-          CREATE EMERGENCY FORM
-      ====================================================== */}
+      {/* CREATE FORM */}
 
       {showCreateForm && (
         <section
@@ -830,7 +726,8 @@ function Emergencies() {
                 style={{
                   gridColumn: "1 / -1",
                   padding: "11px 13px",
-                  border: "1px solid #fecaca",
+                  border:
+                    "1px solid #fecaca",
                   borderRadius: "8px",
                   background: "#fef2f2",
                   color: "#b91c1c",
@@ -864,7 +761,9 @@ function Emergencies() {
                 disabled={creating}
                 style={{
                   ...primaryButtonStyle,
-                  opacity: creating ? 0.65 : 1,
+                  opacity: creating
+                    ? 0.65
+                    : 1,
                   cursor: creating
                     ? "not-allowed"
                     : "pointer",
@@ -879,14 +778,14 @@ function Emergencies() {
         </section>
       )}
 
-      {/* =====================================================
-          STATISTICS
-      ====================================================== */}
+      {/* STATISTICS */}
 
       <section className="emergency-stats">
 
         <div className="emergency-stat-card">
-          <span>Total Emergencies</span>
+          <span>
+            Total Emergencies
+          </span>
 
           <strong>
             {emergencies.length}
@@ -900,7 +799,8 @@ function Emergencies() {
             {
               emergencies.filter(
                 (emergency) =>
-                  emergency.status === "Pending"
+                  emergency.status ===
+                  "Pending"
               ).length
             }
           </strong>
@@ -913,7 +813,8 @@ function Emergencies() {
             {
               emergencies.filter(
                 (emergency) =>
-                  emergency.status === "Assigned"
+                  emergency.status ===
+                  "Assigned"
               ).length
             }
           </strong>
@@ -926,7 +827,8 @@ function Emergencies() {
             {
               emergencies.filter(
                 (emergency) =>
-                  emergency.severity === "Critical"
+                  emergency.severity ===
+                  "Critical"
               ).length
             }
           </strong>
@@ -939,7 +841,8 @@ function Emergencies() {
             {
               emergencies.filter(
                 (emergency) =>
-                  emergency.status === "Completed"
+                  emergency.status ===
+                  "Completed"
               ).length
             }
           </strong>
@@ -947,9 +850,7 @@ function Emergencies() {
 
       </section>
 
-      {/* =====================================================
-          ALL EMERGENCIES
-      ====================================================== */}
+      {/* ALL EMERGENCIES */}
 
       <section className="emergencies-card">
 
@@ -977,11 +878,14 @@ function Emergencies() {
               🚨
             </div>
 
-            <h3>No emergencies found</h3>
+            <h3>
+              No emergencies found
+            </h3>
 
             <p>
-              There are currently no emergency
-              cases in the system.
+              There are currently no
+              emergency cases in the
+              system.
             </p>
 
           </div>
@@ -1007,291 +911,297 @@ function Emergencies() {
 
               <tbody>
 
-                {emergencies.map((emergency) => (
-
-                  <tr
-                    key={emergency.id}
-                    onClick={() =>
-                      openEmergency(emergency.id)
-                    }
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter" ||
-                        event.key === " "
-                      ) {
-                        event.preventDefault();
-
+                {emergencies.map(
+                  (emergency) => (
+                    <tr
+                      key={emergency.id}
+                      onClick={() =>
                         openEmergency(
                           emergency.id
-                        );
+                        )
                       }
-                    }}
-                    tabIndex={0}
-                    title={`Open Emergency #${String(
-                      emergency.id
-                    ).padStart(3, "0")}`}
-                    style={{
-                      cursor: "pointer",
-                    }}
-                  >
+                      onKeyDown={(event) => {
+                        if (
+                          event.key ===
+                            "Enter" ||
+                          event.key === " "
+                        ) {
+                          event.preventDefault();
 
-                    {/* ID */}
+                          openEmergency(
+                            emergency.id
+                          );
+                        }
+                      }}
+                      tabIndex={0}
+                      title={`Open Emergency #${String(
+                        emergency.id
+                      ).padStart(3, "0")}`}
+                      style={{
+                        cursor: "pointer",
+                      }}
+                    >
 
-                    <td>
-                      <strong>
-                        #
-                        {String(
-                          emergency.id
-                        ).padStart(3, "0")}
-                      </strong>
-                    </td>
+                      {/* ID */}
 
-                    {/* PATIENT */}
-
-                    <td>
-                      <div className="patient-info">
-
+                      <td>
                         <strong>
-                          {emergency.patient_name ||
-                            "N/A"}
+                          #
+                          {String(
+                            emergency.id
+                          ).padStart(3, "0")}
                         </strong>
+                      </td>
 
-                        <span>
-                          {emergency.phone ||
-                            "N/A"}
+                      {/* PATIENT */}
+
+                      <td>
+                        <div className="patient-info">
+
+                          <strong>
+                            {emergency.patient_name ||
+                              "N/A"}
+                          </strong>
+
+                          <span>
+                            {emergency.phone ||
+                              "N/A"}
+                          </span>
+
+                        </div>
+                      </td>
+
+                      {/* TYPE */}
+
+                      <td>
+                        {emergency.emergency_type ||
+                          "N/A"}
+                      </td>
+
+                      {/* LOCATION */}
+
+                      <td>
+                        <div className="location-info">
+
+                          <span>
+                            {emergency.location ||
+                              "N/A"}
+                          </span>
+
+                          {emergency.latitude !==
+                            undefined &&
+                            emergency.longitude !==
+                              undefined && (
+                              <small>
+                                {
+                                  emergency.latitude
+                                }
+                                ,{" "}
+                                {
+                                  emergency.longitude
+                                }
+                              </small>
+                            )}
+
+                        </div>
+                      </td>
+
+                      {/* SEVERITY */}
+
+                      <td>
+                        <span
+                          className={getSeverityClass(
+                            emergency.severity
+                          )}
+                        >
+                          {emergency.severity ||
+                            "Unknown"}
                         </span>
+                      </td>
 
-                      </div>
-                    </td>
+                      {/* STATUS */}
 
-                    {/* EMERGENCY TYPE */}
-
-                    <td>
-                      {emergency.emergency_type ||
-                        "N/A"}
-                    </td>
-
-                    {/* LOCATION */}
-
-                    <td>
-                      <div className="location-info">
-
-                        <span>
-                          {emergency.location ||
-                            "N/A"}
+                      <td>
+                        <span
+                          className={getStatusClass(
+                            emergency.status
+                          )}
+                        >
+                          {emergency.status ||
+                            "Unknown"}
                         </span>
+                      </td>
 
-                        {emergency.latitude !==
-                          undefined &&
-                          emergency.longitude !==
-                            undefined && (
-                            <small>
-                              {
-                                emergency.latitude
+                      {/* AMBULANCE */}
+
+                      <td>
+                        {emergency.ambulance_id ? (
+                          <span>
+                            #
+                            {
+                              emergency.ambulance_id
+                            }
+                          </span>
+                        ) : (
+                          <span className="not-assigned">
+                            Not assigned
+                          </span>
+                        )}
+                      </td>
+
+                      {/* HOSPITAL */}
+
+                      <td>
+                        {emergency.hospital_id ? (
+                          <span>
+                            #
+                            {
+                              emergency.hospital_id
+                            }
+                          </span>
+                        ) : (
+                          <span className="not-assigned">
+                            Not assigned
+                          </span>
+                        )}
+                      </td>
+
+                      {/* CREATED */}
+
+                      <td>
+                        <span className="created-date">
+                          {formatDate(
+                            emergency.created_at
+                          )}
+                        </span>
+                      </td>
+
+                      {/* ACTIONS */}
+
+                      <td>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems:
+                              "center",
+                            gap: "7px",
+                          }}
+                        >
+
+                          {/* COMPLETE */}
+
+                          {emergency.status !==
+                          "Completed" ? (
+                            <button
+                              type="button"
+                              className="complete-button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+
+                                completeEmergency(
+                                  emergency.id
+                                );
+                              }}
+                              disabled={
+                                completingId ===
+                                  emergency.id ||
+                                deletingId ===
+                                  emergency.id
                               }
-                              ,{" "}
-                              {
-                                emergency.longitude
-                              }
-                            </small>
+                            >
+                              {completingId ===
+                              emergency.id
+                                ? "Completing..."
+                                : "Complete"}
+                            </button>
+                          ) : (
+                            <span className="completed-label">
+                              ✓ Completed
+                            </span>
                           )}
 
-                      </div>
-                    </td>
+                          {/* VIEW */}
 
-                    {/* SEVERITY */}
-
-                    <td>
-                      <span
-                        className={getSeverityClass(
-                          emergency.severity
-                        )}
-                      >
-                        {emergency.severity ||
-                          "Unknown"}
-                      </span>
-                    </td>
-
-                    {/* STATUS */}
-
-                    <td>
-                      <span
-                        className={getStatusClass(
-                          emergency.status
-                        )}
-                      >
-                        {emergency.status ||
-                          "Unknown"}
-                      </span>
-                    </td>
-
-                    {/* AMBULANCE */}
-
-                    <td>
-                      {emergency.ambulance_id ? (
-                        <span>
-                          #
-                          {
-                            emergency.ambulance_id
-                          }
-                        </span>
-                      ) : (
-                        <span className="not-assigned">
-                          Not assigned
-                        </span>
-                      )}
-                    </td>
-
-                    {/* HOSPITAL */}
-
-                    <td>
-                      {emergency.hospital_id ? (
-                        <span>
-                          #
-                          {
-                            emergency.hospital_id
-                          }
-                        </span>
-                      ) : (
-                        <span className="not-assigned">
-                          Not assigned
-                        </span>
-                      )}
-                    </td>
-
-                    {/* CREATED */}
-
-                    <td>
-                      <span className="created-date">
-                        {formatDate(
-                          emergency.created_at
-                        )}
-                      </span>
-                    </td>
-
-                    {/* ACTIONS */}
-
-                    <td>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "7px",
-                        }}
-                      >
-
-                        {/* COMPLETE */}
-
-                        {emergency.status !==
-                        "Completed" ? (
                           <button
                             type="button"
-                            className="complete-button"
                             onClick={(event) => {
                               event.stopPropagation();
 
-                              completeEmergency(
+                              openEmergency(
+                                emergency.id
+                              );
+                            }}
+                            style={{
+                              minWidth: "58px",
+                              height: "30px",
+                              padding: "0 10px",
+                              border:
+                                "1px solid #2563eb",
+                              borderRadius: "7px",
+                              background:
+                                "#ffffff",
+                              color: "#2563eb",
+                              fontSize: "10px",
+                              fontWeight: "700",
+                              cursor: "pointer",
+                            }}
+                          >
+                            View
+                          </button>
+
+                          {/* DELETE */}
+
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+
+                              deleteEmergency(
                                 emergency.id
                               );
                             }}
                             disabled={
-                              completingId ===
-                                emergency.id ||
                               deletingId ===
+                                emergency.id ||
+                              completingId ===
                                 emergency.id
                             }
+                            style={{
+                              minWidth: "65px",
+                              height: "30px",
+                              padding: "0 10px",
+                              border:
+                                "1px solid #dc2626",
+                              borderRadius: "7px",
+                              background:
+                                "#ffffff",
+                              color: "#dc2626",
+                              fontSize: "10px",
+                              fontWeight: "700",
+                              cursor:
+                                deletingId ===
+                                emergency.id
+                                  ? "not-allowed"
+                                  : "pointer",
+                              opacity:
+                                deletingId ===
+                                emergency.id
+                                  ? 0.6
+                                  : 1,
+                            }}
                           >
-                            {completingId ===
+                            {deletingId ===
                             emergency.id
-                              ? "Completing..."
-                              : "Complete"}
+                              ? "Deleting..."
+                              : "Delete"}
                           </button>
-                        ) : (
-                          <span className="completed-label">
-                            ✓ Completed
-                          </span>
-                        )}
 
-                        {/* VIEW */}
+                        </div>
+                      </td>
 
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-
-                            openEmergency(
-                              emergency.id
-                            );
-                          }}
-                          style={{
-                            minWidth: "58px",
-                            height: "30px",
-                            padding: "0 10px",
-                            border:
-                              "1px solid #2563eb",
-                            borderRadius: "7px",
-                            background: "#ffffff",
-                            color: "#2563eb",
-                            fontSize: "10px",
-                            fontWeight: "700",
-                            cursor: "pointer",
-                          }}
-                        >
-                          View
-                        </button>
-
-                        {/* DELETE */}
-
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-
-                            deleteEmergency(
-                              emergency.id
-                            );
-                          }}
-                          disabled={
-                            deletingId ===
-                              emergency.id ||
-                            completingId ===
-                              emergency.id
-                          }
-                          style={{
-                            minWidth: "65px",
-                            height: "30px",
-                            padding: "0 10px",
-                            border:
-                              "1px solid #dc2626",
-                            borderRadius: "7px",
-                            background: "#ffffff",
-                            color: "#dc2626",
-                            fontSize: "10px",
-                            fontWeight: "700",
-                            cursor:
-                              deletingId ===
-                                emergency.id
-                                ? "not-allowed"
-                                : "pointer",
-                            opacity:
-                              deletingId ===
-                                emergency.id
-                                ? 0.6
-                                : 1,
-                          }}
-                        >
-                          {deletingId ===
-                          emergency.id
-                            ? "Deleting..."
-                            : "Delete"}
-                        </button>
-
-                      </div>
-                    </td>
-
-                  </tr>
-
-                ))}
+                    </tr>
+                  )
+                )}
 
               </tbody>
 
@@ -1324,7 +1234,8 @@ const inputStyle = {
   minHeight: "40px",
   boxSizing: "border-box",
   padding: "9px 11px",
-  border: "1px solid #d1d5db",
+  border:
+    "1px solid #d1d5db",
   borderRadius: "7px",
   background: "#ffffff",
   color: "#111827",
@@ -1334,7 +1245,8 @@ const inputStyle = {
 const primaryButtonStyle = {
   minHeight: "40px",
   padding: "0 17px",
-  border: "1px solid #dc2626",
+  border:
+    "1px solid #dc2626",
   borderRadius: "8px",
   background: "#dc2626",
   color: "#ffffff",
@@ -1346,7 +1258,8 @@ const primaryButtonStyle = {
 const secondaryButtonStyle = {
   minHeight: "40px",
   padding: "0 13px",
-  border: "1px solid #d1d5db",
+  border:
+    "1px solid #d1d5db",
   borderRadius: "7px",
   background: "#ffffff",
   color: "#374151",
@@ -1358,7 +1271,8 @@ const secondaryButtonStyle = {
 const cancelButtonStyle = {
   minHeight: "40px",
   padding: "0 17px",
-  border: "1px solid #d1d5db",
+  border:
+    "1px solid #d1d5db",
   borderRadius: "8px",
   background: "#ffffff",
   color: "#374151",

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import "./Hospital.css";
-
-const API_URL = "http://127.0.0.1:8000";
+import {
+  apiGet,
+  apiPost,
+  apiPut,
+  apiDelete,
+} from "../api";
 
 function Hospital({ onNavigate }) {
   const [hospitals, setHospitals] = useState([]);
@@ -21,45 +25,15 @@ function Hospital({ onNavigate }) {
     status: "Available",
   });
 
-  const token =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("token");
-
   // ==========================================
   // FETCH HOSPITALS
   // ==========================================
 
   const fetchHospitals = useCallback(async () => {
     try {
-      if (!token) {
-        throw new Error("Session expired. Please login again.");
-      }
+      setError("");
 
-      const response = await fetch(`${API_URL}/hospitals`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Session expired. Please login again.");
-        }
-
-        if (response.status === 403) {
-          throw new Error(
-            "You do not have permission to view hospitals."
-          );
-        }
-
-        throw new Error(
-          data?.detail || "Failed to load hospitals."
-        );
-      }
+      const data = await apiGet("/hospitals");
 
       /*
        * Backend currently returns:
@@ -79,7 +53,6 @@ function Hospital({ onNavigate }) {
           : [];
 
       setHospitals(hospitalList);
-      setError("");
     } catch (err) {
       console.error("Hospital fetch error:", err);
 
@@ -89,7 +62,7 @@ function Hospital({ onNavigate }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   // ==========================================
   // INITIAL LOAD
@@ -220,12 +193,6 @@ function Hospital({ onNavigate }) {
     event.preventDefault();
 
     try {
-      if (!token) {
-        throw new Error(
-          "Session expired. Please login again."
-        );
-      }
-
       const payload = {
         name: formData.name.trim(),
         location: formData.location.trim(),
@@ -273,34 +240,15 @@ function Hospital({ onNavigate }) {
         );
       }
 
-      const isEditing =
-        Boolean(editingHospital);
-
-      const url = isEditing
-        ? `${API_URL}/hospitals/${editingHospital.id}`
-        : `${API_URL}/hospitals`;
-
-      const response = await fetch(url, {
-        method: isEditing ? "PUT" : "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response
-        .json()
-        .catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            `Failed to ${
-              isEditing
-                ? "update"
-                : "create"
-            } hospital.`
+      if (editingHospital) {
+        await apiPut(
+          `/hospitals/${editingHospital.id}`,
+          payload
+        );
+      } else {
+        await apiPost(
+          "/hospitals",
+          payload
         );
       }
 
@@ -334,40 +282,15 @@ function Hospital({ onNavigate }) {
     }
 
     try {
-      if (!token) {
-        throw new Error(
-          "Session expired. Please login again."
-        );
-      }
-
-      const response = await fetch(
-        `${API_URL}/hospitals/${hospital.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+      await apiDelete(
+        `/hospitals/${hospital.id}`
       );
-
-      const data = await response
-        .json()
-        .catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            "Failed to delete hospital."
-        );
-      }
 
       // Immediately remove deleted hospital
       // from the current UI.
       setHospitals((current) =>
         current.filter(
-          (item) =>
-            item.id !== hospital.id
+          (item) => item.id !== hospital.id
         )
       );
     } catch (err) {
@@ -489,7 +412,10 @@ function Hospital({ onNavigate }) {
 
           <button
             className="refresh-button"
-            onClick={fetchHospitals}
+            onClick={() => {
+              setLoading(true);
+              fetchHospitals();
+            }}
           >
             ↻ Refresh
           </button>
@@ -527,7 +453,10 @@ function Hospital({ onNavigate }) {
           </div>
 
           <button
-            onClick={fetchHospitals}
+            onClick={() => {
+              setLoading(true);
+              fetchHospitals();
+            }}
           >
             Try Again
           </button>

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-
-const API_URL = "http://127.0.0.1:8000";
+import { apiGet } from "../api";
 
 function CitizenDashboard({ onLogout, onNavigate }) {
   const [emergency, setEmergency] = useState(null);
@@ -12,17 +11,6 @@ function CitizenDashboard({ onLogout, onNavigate }) {
   const [location, setLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState("");
-
-  // ============================================================
-  // GET TOKEN
-  // ============================================================
-
-  const getToken = () => {
-    return (
-      localStorage.getItem("access_token") ||
-      localStorage.getItem("token")
-    );
-  };
 
   // ============================================================
   // LOGOUT
@@ -57,7 +45,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
   };
 
   // ============================================================
-  // LOAD ALL CITIZEN EMERGENCIES
+  // LOAD CITIZEN EMERGENCIES
   // ============================================================
 
   const loadEmergency = useCallback(async () => {
@@ -65,60 +53,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
     setError("");
 
     try {
-      const token = getToken();
-
-      if (!token) {
-        throw new Error(
-          "No authentication token found. Please login again."
-        );
-      }
-
-      const response = await fetch(
-        `${API_URL}/emergencies/my`,
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      let data = null;
-
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
-      // ========================================================
-      // ERROR HANDLING
-      // ========================================================
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error(
-            "Session expired. Please login again."
-          );
-        }
-
-        if (response.status === 403) {
-          throw new Error(
-            "You do not have permission to access your emergencies."
-          );
-        }
-
-        throw new Error(
-          data?.detail ||
-            data?.message ||
-            `Unable to load emergencies (${response.status}).`
-        );
-      }
-
-      // ========================================================
-      // EXTRACT EMERGENCY LIST
-      // ========================================================
+      const data = await apiGet("/emergencies/my");
 
       let emergencies = [];
 
@@ -130,10 +65,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
         emergencies = [data.emergency];
       }
 
-      // ========================================================
-      // SORT NEWEST FIRST
-      // ========================================================
-
+      // Newest emergency first
       const sortedEmergencies = [...emergencies].sort(
         (a, b) => {
           const dateA = a?.created_at
@@ -148,21 +80,12 @@ function CitizenDashboard({ onLogout, onNavigate }) {
         }
       );
 
-      // ========================================================
-      // STORE COMPLETE HISTORY
-      // ========================================================
-
       setEmergencyHistory(sortedEmergencies);
 
-      // ========================================================
-      // FIND ACTIVE EMERGENCY
-      //
-      // Pending + Assigned = Active
-      // Completed = History only
-      // ========================================================
-
-      const activeEmergencies = sortedEmergencies.filter(
-        (item) => {
+      // Pending + Assigned are active.
+      // Completed emergencies remain in history.
+      const activeEmergencies =
+        sortedEmergencies.filter((item) => {
           const status = String(
             item?.status || ""
           ).toLowerCase();
@@ -171,17 +94,12 @@ function CitizenDashboard({ onLogout, onNavigate }) {
             status === "pending" ||
             status === "assigned"
           );
-        }
-      );
+        });
 
       const activeEmergency =
         activeEmergencies.length > 0
           ? activeEmergencies[0]
           : null;
-
-      // ========================================================
-      // STORE ACTIVE EMERGENCY ID
-      // ========================================================
 
       if (activeEmergency?.id != null) {
         localStorage.setItem(
@@ -279,7 +197,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
   };
 
   // ============================================================
-  // LOADING SCREEN
+  // LOADING
   // ============================================================
 
   if (loading) {
@@ -299,7 +217,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
   }
 
   // ============================================================
-  // ERROR SCREEN
+  // ERROR
   // ============================================================
 
   if (error) {
@@ -309,7 +227,9 @@ function CitizenDashboard({ onLogout, onNavigate }) {
 
         <main style={styles.container}>
           <div style={styles.errorCard}>
-            <div style={{ fontSize: 45 }}>⚠️</div>
+            <div style={{ fontSize: 45 }}>
+              ⚠️
+            </div>
 
             <h2>
               Unable to load emergencies
@@ -320,6 +240,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
             </p>
 
             <button
+              type="button"
               style={styles.primary}
               onClick={loadEmergency}
             >
@@ -332,7 +253,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
   }
 
   // ============================================================
-  // AMBULANCE DATA FOR ACTIVE EMERGENCY
+  // ACTIVE AMBULANCE
   // ============================================================
 
   const ambulance =
@@ -367,9 +288,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
 
       <main style={styles.container}>
 
-        {/* ======================================================
-            PAGE TITLE + ACTIONS
-        ====================================================== */}
+        {/* PAGE TITLE */}
 
         <div style={styles.topRow}>
           <div>
@@ -401,9 +320,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
           </div>
         </div>
 
-        {/* ======================================================
-            QUICK ACTION CARD
-        ====================================================== */}
+        {/* QUICK ACTION */}
 
         <section style={styles.reportCard}>
           <div style={styles.reportIcon}>
@@ -432,9 +349,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
           </button>
         </section>
 
-        {/* ======================================================
-            ACTIVE EMERGENCY
-        ====================================================== */}
+        {/* ACTIVE EMERGENCY */}
 
         {emergency ? (
           <>
@@ -472,9 +387,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
               </div>
             </section>
 
-            {/* ==================================================
-                EMERGENCY STATUS
-            ================================================== */}
+            {/* EMERGENCY STATUS */}
 
             <section style={styles.card}>
               <span style={styles.label}>
@@ -512,9 +425,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
               </div>
             </section>
 
-            {/* ==================================================
-                ASSIGNED AMBULANCE
-            ================================================== */}
+            {/* AMBULANCE */}
 
             <section style={styles.card}>
               <div style={styles.cardTop}>
@@ -617,9 +528,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
               )}
             </section>
 
-            {/* ==================================================
-                HOSPITAL
-            ================================================== */}
+            {/* HOSPITAL */}
 
             <section style={styles.card}>
               <span style={styles.label}>
@@ -650,9 +559,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
               </div>
             </section>
 
-            {/* ==================================================
-                EMERGENCY LOCATION
-            ================================================== */}
+            {/* EMERGENCY LOCATION */}
 
             <section style={styles.card}>
               <span style={styles.label}>
@@ -685,9 +592,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
               </div>
             </section>
 
-            {/* ==================================================
-                DEVICE LOCATION
-            ================================================== */}
+            {/* DEVICE LOCATION */}
 
             <section style={styles.card}>
               <div style={styles.cardTop}>
@@ -702,6 +607,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
                 </div>
 
                 <button
+                  type="button"
                   style={{
                     ...styles.primary,
                     opacity:
@@ -741,9 +647,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
               )}
             </section>
 
-            {/* ==================================================
-                PATIENT INFORMATION
-            ================================================== */}
+            {/* PATIENT INFORMATION */}
 
             <section style={styles.card}>
               <span style={styles.label}>
@@ -773,9 +677,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
               </div>
             </section>
 
-            {/* ==================================================
-                SYSTEM INFORMATION
-            ================================================== */}
+            {/* SYSTEM INFORMATION */}
 
             <section style={styles.card}>
               <span style={styles.label}>
@@ -803,12 +705,12 @@ function CitizenDashboard({ onLogout, onNavigate }) {
             </section>
           </>
         ) : (
-          /* ====================================================
-             NO ACTIVE EMERGENCY
-          ==================================================== */
+          /* NO ACTIVE EMERGENCY */
 
           <section style={styles.emptyPage}>
-            <div style={{ fontSize: 55 }}>🛡️</div>
+            <div style={{ fontSize: 55 }}>
+              🛡️
+            </div>
 
             <h2>
               No Active Emergency
@@ -844,9 +746,7 @@ function CitizenDashboard({ onLogout, onNavigate }) {
           </section>
         )}
 
-        {/* ======================================================
-            EMERGENCY HISTORY
-        ====================================================== */}
+        {/* EMERGENCY HISTORY */}
 
         <section style={styles.card}>
           <div style={styles.cardTop}>
@@ -901,27 +801,19 @@ function CitizenDashboard({ onLogout, onNavigate }) {
               {emergencyHistory.map(
                 (historyEmergency) => (
                   <EmergencyHistoryCard
-                    key={
-                      historyEmergency.id
-                    }
-                    emergency={
-                      historyEmergency
-                    }
-                    activeId={
-                      emergency?.id
-                    }
+                    key={historyEmergency.id}
+                    emergency={historyEmergency}
+                    activeId={emergency?.id}
                   />
                 )
               )}
             </div>
           )}
         </section>
-
       </main>
     </div>
   );
 }
-
 
 // ============================================================
 // HEADER
@@ -951,9 +843,8 @@ function Header({ onLogout }) {
   );
 }
 
-
 // ============================================================
-// EMERGENCY HISTORY CARD
+// HISTORY CARD
 // ============================================================
 
 function EmergencyHistoryCard({
@@ -1070,9 +961,8 @@ function EmergencyHistoryCard({
   );
 }
 
-
 // ============================================================
-// FORMAT COORDINATES
+// HELPERS
 // ============================================================
 
 function formatCoord(value) {
@@ -1085,11 +975,6 @@ function formatCoord(value) {
 
   return Number(value).toFixed(4);
 }
-
-
-// ============================================================
-// FORMAT DATE
-// ============================================================
 
 function formatDate(value) {
   if (!value) {
@@ -1104,11 +989,6 @@ function formatDate(value) {
 
   return date.toLocaleString();
 }
-
-
-// ============================================================
-// STATUS STYLE
-// ============================================================
 
 function getStatusStyle(status) {
   const normalized = String(
@@ -1145,11 +1025,6 @@ function getStatusStyle(status) {
     color: "#374151",
   };
 }
-
-
-// ============================================================
-// SEVERITY STYLE
-// ============================================================
 
 function getSeverityStyle(severity) {
   const normalized = String(
@@ -1195,9 +1070,8 @@ function getSeverityStyle(severity) {
   };
 }
 
-
 // ============================================================
-// INFO COMPONENT
+// INFO
 // ============================================================
 
 function Info({ label, value }) {
@@ -1214,9 +1088,8 @@ function Info({ label, value }) {
   );
 }
 
-
 // ============================================================
-// METRIC COMPONENT
+// METRIC
 // ============================================================
 
 function Metric({
@@ -1240,7 +1113,6 @@ function Metric({
     </div>
   );
 }
-
 
 // ============================================================
 // STYLES
@@ -1331,8 +1203,7 @@ const styles = {
 
   card: {
     background: "#ffffff",
-    border:
-      "1px solid #e5e7eb",
+    border: "1px solid #e5e7eb",
     borderRadius: 16,
     padding: 22,
     marginBottom: 18,
@@ -1342,10 +1213,8 @@ const styles = {
 
   reportCard: {
     background: "#fff7f7",
-    border:
-      "1px solid #fecaca",
-    borderLeft:
-      "5px solid #dc2626",
+    border: "1px solid #fecaca",
+    borderLeft: "5px solid #dc2626",
     borderRadius: 16,
     padding: 22,
     marginBottom: 18,
@@ -1402,10 +1271,8 @@ const styles = {
 
   activeBanner: {
     background: "#ffffff",
-    border:
-      "1px solid #fecaca",
-    borderLeft:
-      "5px solid #dc2626",
+    border: "1px solid #fecaca",
+    borderLeft: "5px solid #dc2626",
     borderRadius: 16,
     padding: 22,
     marginBottom: 18,
@@ -1501,8 +1368,7 @@ const styles = {
 
   info: {
     background: "#f8fafc",
-    border:
-      "1px solid #e5e7eb",
+    border: "1px solid #e5e7eb",
     borderRadius: 11,
     padding: 14,
     minWidth: 0,
@@ -1524,16 +1390,14 @@ const styles = {
 
   locationBox: {
     background: "#fbfdff",
-    border:
-      "1px solid #e5e7eb",
+    border: "1px solid #e5e7eb",
     borderRadius: 13,
     padding: 17,
     margin: "16px 0",
   },
 
   metric: {
-    border:
-      "1px solid #e5e7eb",
+    border: "1px solid #e5e7eb",
     borderRadius: 13,
     padding: 18,
     background: "#ffffff",
@@ -1549,8 +1413,7 @@ const styles = {
     textAlign: "center",
     padding: 28,
     background: "#fafafa",
-    border:
-      "1px dashed #d1d5db",
+    border: "1px dashed #d1d5db",
     borderRadius: 13,
   },
 
@@ -1559,8 +1422,7 @@ const styles = {
     margin: "0 auto 20px",
     padding: 35,
     background: "#ffffff",
-    border:
-      "1px solid #e5e7eb",
+    border: "1px solid #e5e7eb",
     borderRadius: 16,
     textAlign: "center",
     boxShadow:
@@ -1595,8 +1457,7 @@ const styles = {
   },
 
   secondary: {
-    border:
-      "1px solid #d1d5db",
+    border: "1px solid #d1d5db",
     background: "#ffffff",
     color: "#374151",
     borderRadius: 9,
@@ -1606,8 +1467,7 @@ const styles = {
   },
 
   logout: {
-    border:
-      "1px solid #e5e7eb",
+    border: "1px solid #e5e7eb",
     background: "#ffffff",
     borderRadius: 9,
     padding: "10px 15px",
@@ -1620,8 +1480,7 @@ const styles = {
     margin: "70px auto",
     padding: 35,
     background: "#ffffff",
-    border:
-      "1px solid #fecaca",
+    border: "1px solid #fecaca",
     borderRadius: 16,
     textAlign: "center",
   },
@@ -1643,15 +1502,13 @@ const styles = {
 
   historyCard: {
     background: "#ffffff",
-    border:
-      "1px solid #e5e7eb",
+    border: "1px solid #e5e7eb",
     borderRadius: 14,
     padding: 18,
   },
 
   historyCardActive: {
-    border:
-      "2px solid #dc2626",
+    border: "2px solid #dc2626",
     background: "#fffafa",
   },
 
@@ -1671,8 +1528,7 @@ const styles = {
   historyFooter: {
     marginTop: 14,
     paddingTop: 14,
-    borderTop:
-      "1px solid #e5e7eb",
+    borderTop: "1px solid #e5e7eb",
     display: "flex",
     alignItems: "center",
     gap: 25,
