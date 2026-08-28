@@ -185,6 +185,26 @@ function Users() {
         throw new Error("Password is required.");
       }
 
+      const email = addForm.email.trim().toLowerCase();
+      const phone = addForm.phone.trim();
+
+      const emailAlreadyExists = users.some(
+        (user) =>
+          String(user.email || "").trim().toLowerCase() === email
+      );
+
+      if (emailAlreadyExists) {
+        throw new Error("Email already registered.");
+      }
+
+      const phoneAlreadyExists = users.some(
+        (user) => String(user.phone || "").trim() === phone
+      );
+
+      if (phoneAlreadyExists) {
+        throw new Error("Phone number already registered.");
+      }
+
       const data = await apiPost("/users", {
         full_name: addForm.full_name.trim(),
         email: addForm.email.trim(),

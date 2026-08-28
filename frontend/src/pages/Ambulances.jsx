@@ -335,7 +335,7 @@ function Ambulances({ onNavigate }) {
               }
             }}
           >
-            ←
+            ← Dashboard
           </button>
 
           <div>
