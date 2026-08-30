@@ -30,34 +30,59 @@ class Emergency(Base):
 
     longitude = Column(Float, nullable=False)
 
+    # Emergency status
     status = Column(
         String,
-        default="Pending"
+        default="Pending",
+        nullable=False
     )
 
+    # AI severity classification
     severity = Column(
         String,
-        default="Medium"
+        default="Medium",
+        nullable=False
     )
 
+    # AI priority score
+    # Critical = 100
+    # High = 75
+    # Medium = 50
+    # Low = 25
+    priority_score = Column(
+        Integer,
+        default=50,
+        nullable=False
+    )
+
+    # Explainable AI reason
+    ai_reason = Column(
+        String,
+        nullable=True
+    )
+
+    # User who reported the emergency
     user_id = Column(
         Integer,
         ForeignKey("users.id"),
         nullable=False
     )
 
+    # Assigned ambulance
     ambulance_id = Column(
         Integer,
         ForeignKey("ambulances.id"),
         nullable=True
     )
 
+    # Assigned hospital
     hospital_id = Column(
         Integer,
         ForeignKey("hospitals.id"),
         nullable=True
     )
 
+    # Emergency creation timestamp
     created_at = Column(
         DateTime,
         default=datetime.utcnow
