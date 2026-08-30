@@ -4,29 +4,71 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+# =========================================================
+# CREATE EMERGENCY
+# =========================================================
+
 class EmergencyCreate(BaseModel):
-    patient_name: str
-    phone: str
-    emergency_type: str
-    location: str
+    patient_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+    )
 
-    latitude: float
-    longitude: float
+    phone: str = Field(
+        ...,
+        pattern=r"^[6-9]\d{9}$",
+    )
 
+    emergency_type: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+    )
+
+    location: str = Field(
+        ...,
+        min_length=2,
+        max_length=255,
+    )
+
+    latitude: float = Field(
+        ...,
+        ge=-90,
+        le=90,
+    )
+
+    longitude: float = Field(
+        ...,
+        ge=-180,
+        le=180,
+    )
+
+
+# =========================================================
+# UPDATE EMERGENCY
+# =========================================================
 
 class EmergencyUpdate(BaseModel):
-    status: Optional[str] = None
+    status: Optional[str] = Field(
+        default=None,
+        pattern=r"^(Pending|Assigned)$",
+    )
 
     ambulance_id: Optional[int] = Field(
         default=None,
-        gt=0
+        gt=0,
     )
 
     hospital_id: Optional[int] = Field(
         default=None,
-        gt=0
+        gt=0,
     )
 
+
+# =========================================================
+# AMBULANCE RESPONSE
+# =========================================================
 
 class AmbulanceResponse(BaseModel):
     id: int
@@ -36,6 +78,10 @@ class AmbulanceResponse(BaseModel):
     latitude: float
     longitude: float
 
+
+# =========================================================
+# EMERGENCY RESPONSE
+# =========================================================
 
 class EmergencyResponse(BaseModel):
     id: int
@@ -58,10 +104,8 @@ class EmergencyResponse(BaseModel):
 
     ambulance: Optional[AmbulanceResponse] = None
 
-    # Distance from ambulance to emergency
     distance_km: Optional[float] = None
 
-    # Estimated ambulance arrival time
     estimated_arrival_minutes: Optional[int] = None
 
     created_at: datetime

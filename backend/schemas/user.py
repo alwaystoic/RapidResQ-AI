@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 # =========================================================
@@ -8,12 +8,34 @@ from pydantic import BaseModel, EmailStr
 # =========================================================
 
 class UserCreate(BaseModel):
-    full_name: str
+    full_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+    )
+
     email: EmailStr
-    phone: str
-    password: str
-    role: str
-    status: Optional[str] = "Active"
+
+    phone: str = Field(
+        ...,
+        pattern=r"^[6-9]\d{9}$",
+    )
+
+    password: str = Field(
+        ...,
+        min_length=6,
+        max_length=128,
+    )
+
+    role: str = Field(
+        ...,
+        pattern=r"^(Admin|Citizen)$",
+    )
+
+    status: Optional[str] = Field(
+        default="Active",
+        pattern=r"^(Active|Inactive)$",
+    )
 
 
 # =========================================================
@@ -21,12 +43,34 @@ class UserCreate(BaseModel):
 # =========================================================
 
 class UserUpdate(BaseModel):
-    full_name: str
+    full_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+    )
+
     email: EmailStr
-    phone: str
-    role: str
-    status: str
-    password: Optional[str] = None
+
+    phone: str = Field(
+        ...,
+        pattern=r"^[6-9]\d{9}$",
+    )
+
+    role: str = Field(
+        ...,
+        pattern=r"^(Admin|Citizen)$",
+    )
+
+    status: str = Field(
+        ...,
+        pattern=r"^(Active|Inactive)$",
+    )
+
+    password: Optional[str] = Field(
+        default=None,
+        min_length=6,
+        max_length=128,
+    )
 
 
 # =========================================================
@@ -35,7 +79,12 @@ class UserUpdate(BaseModel):
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+
+    password: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+    )
 
 
 # =========================================================

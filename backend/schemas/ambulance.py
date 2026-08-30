@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ==========================================
@@ -8,13 +8,34 @@ from pydantic import BaseModel
 # ==========================================
 
 class AmbulanceCreate(BaseModel):
-    vehicle: str
-    location: str
+    vehicle: str = Field(
+        ...,
+        min_length=2,
+        max_length=50,
+    )
 
-    latitude: float
-    longitude: float
+    location: str = Field(
+        ...,
+        min_length=2,
+        max_length=255,
+    )
 
-    status: Optional[str] = "Available"
+    latitude: float = Field(
+        ...,
+        ge=-90,
+        le=90,
+    )
+
+    longitude: float = Field(
+        ...,
+        ge=-180,
+        le=180,
+    )
+
+    status: Optional[str] = Field(
+        default="Available",
+        pattern=r"^(Available|Assigned|Dispatched|Busy)$",
+    )
 
 
 # ==========================================
@@ -22,13 +43,34 @@ class AmbulanceCreate(BaseModel):
 # ==========================================
 
 class AmbulanceUpdate(BaseModel):
-    vehicle: str
-    location: str
+    vehicle: str = Field(
+        ...,
+        min_length=2,
+        max_length=50,
+    )
 
-    latitude: float
-    longitude: float
+    location: str = Field(
+        ...,
+        min_length=2,
+        max_length=255,
+    )
 
-    status: str
+    latitude: float = Field(
+        ...,
+        ge=-90,
+        le=90,
+    )
+
+    longitude: float = Field(
+        ...,
+        ge=-180,
+        le=180,
+    )
+
+    status: str = Field(
+        ...,
+        pattern=r"^(Available|Assigned|Dispatched|Busy)$",
+    )
 
 
 # ==========================================

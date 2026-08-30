@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, status, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.database.database import get_db
@@ -8,6 +9,7 @@ from backend.schemas.hospital import HospitalCreate
 from backend.auth.dependencies import get_current_user
 from backend.auth.roles import require_role
 from backend.models.user import User
+
 
 router = APIRouter()
 
@@ -21,7 +23,7 @@ def hospital_response(hospital):
         "available_beds": hospital.available_beds,
         "latitude": hospital.latitude,
         "longitude": hospital.longitude,
-        "status": hospital.status
+        "status": hospital.status,
     }
 
 
@@ -33,7 +35,7 @@ def hospital_response(hospital):
 def get_hospitals(
     location: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     query = db.query(Hospital)
 
@@ -45,9 +47,9 @@ def get_hospitals(
     return {
         "logged_in_as": current_user.email,
         "hospitals": [
-            hospital_response(h)
-            for h in hospitals
-        ]
+            hospital_response(hospital)
+            for hospital in hospitals
+        ],
     }
 
 
@@ -59,7 +61,7 @@ def get_hospitals(
 def get_hospital(
     hospital_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     hospital = db.query(Hospital).filter(
         Hospital.id == hospital_id
@@ -67,8 +69,8 @@ def get_hospital(
 
     if not hospital:
         raise HTTPException(
-            status_code=404,
-            detail="Hospital not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Hospital not found",
         )
 
     return hospital_response(hospital)
@@ -78,29 +80,49 @@ def get_hospital(
 # CREATE HOSPITAL
 # (Admin Only)
 # ==========================
-@router.post("/hospitals", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/hospitals",
+    status_code=status.HTTP_201_CREATED,
+)
 def create_hospital(
     hospital: HospitalCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
+    current_user: User = Depends(require_role("Admin")),
 ):
     new_hospital = Hospital(
-    name=hospital.name,
-    location=hospital.location,
-    contact=hospital.contact,
-    available_beds=hospital.available_beds,
-    latitude=hospital.latitude,
-    longitude=hospital.longitude,
-    status=hospital.status
-)
+        name=hospital.name,
+        location=hospital.location,
+        contact=hospital.contact,
+        available_beds=hospital.available_beds,
+        latitude=hospital.latitude,
+        longitude=hospital.longitude,
+        status=hospital.status,
+    )
 
-    db.add(new_hospital)
-    db.commit()
-    db.refresh(new_hospital)
+    try:
+        db.add(new_hospital)
+        db.commit()
+        db.refresh(new_hospital)
+
+    except IntegrityError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to create hospital because of a database constraint.",
+        )
+
+    except Exception:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while creating the hospital.",
+        )
 
     return {
         "message": "Hospital created successfully",
-        "data": hospital_response(new_hospital)
+        "data": hospital_response(new_hospital),
     }
 
 
@@ -113,7 +135,7 @@ def update_hospital(
     hospital_id: int,
     hospital: HospitalCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
+    current_user: User = Depends(require_role("Admin")),
 ):
     db_hospital = db.query(Hospital).filter(
         Hospital.id == hospital_id
@@ -121,8 +143,8 @@ def update_hospital(
 
     if not db_hospital:
         raise HTTPException(
-            status_code=404,
-            detail="Hospital not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Hospital not found",
         )
 
     db_hospital.name = hospital.name
@@ -133,12 +155,29 @@ def update_hospital(
     db_hospital.latitude = hospital.latitude
     db_hospital.longitude = hospital.longitude
 
-    db.commit()
-    db.refresh(db_hospital)
+    try:
+        db.commit()
+        db.refresh(db_hospital)
+
+    except IntegrityError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to update hospital because of a database constraint.",
+        )
+
+    except Exception:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while updating the hospital.",
+        )
 
     return {
         "message": "Hospital updated successfully",
-        "data": hospital_response(db_hospital)
+        "data": hospital_response(db_hospital),
     }
 
 
@@ -150,7 +189,7 @@ def update_hospital(
 def delete_hospital(
     hospital_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
+    current_user: User = Depends(require_role("Admin")),
 ):
     db_hospital = db.query(Hospital).filter(
         Hospital.id == hospital_id
@@ -158,13 +197,33 @@ def delete_hospital(
 
     if not db_hospital:
         raise HTTPException(
-            status_code=404,
-            detail="Hospital not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Hospital not found",
         )
 
-    db.delete(db_hospital)
-    db.commit()
+    try:
+        db.delete(db_hospital)
+        db.commit()
+
+    except IntegrityError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Cannot delete this hospital because it is "
+                "associated with an emergency."
+            ),
+        )
+
+    except Exception:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while deleting the hospital.",
+        )
 
     return {
-        "message": "Hospital deleted successfully"
+        "message": "Hospital deleted successfully",
     }
