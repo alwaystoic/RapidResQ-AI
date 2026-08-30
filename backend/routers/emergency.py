@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database.database import get_db
+
 from backend.models.emergency import Emergency
 from backend.models.user import User
 from backend.models.ambulance import Ambulance
@@ -16,7 +17,11 @@ from backend.auth.dependencies import get_current_user
 from backend.auth.roles import require_role
 
 from backend.services.ai_service import analyze_emergency
-from backend.services.assignment_service import find_nearest_ambulance
+from backend.services.assignment_service import (
+    find_nearest_ambulance,
+    assign_ambulance_to_next_emergency,
+    dispatch_available_ambulances,
+)
 from backend.services.hospital_assignment import find_nearest_hospital
 
 from backend.routers.ambulance import ambulance_response
@@ -40,8 +45,8 @@ def emergency_response(emergency, db):
     - Emergency details
     - AI severity
     - AI priority score
-    - AI explanation/reason
-    - Assigned ambulance details
+    - AI explanation
+    - Assigned ambulance
     - Ambulance distance
     - Estimated arrival time
     - Assigned hospital
@@ -64,12 +69,16 @@ def emergency_response(emergency, db):
 
     priority_score = ai_analysis.get(
         "priority_score",
-        50
+        getattr(emergency, "priority_score", 50)
     )
 
     ai_reason = ai_analysis.get(
         "reason",
-        "Emergency classified based on available information."
+        getattr(
+            emergency,
+            "ai_reason",
+            "Emergency classified based on available information."
+        )
     )
 
     # ========================================================
@@ -88,10 +97,6 @@ def emergency_response(emergency, db):
 
         if ambulance:
 
-            # =================================================
-            # CALCULATE DISTANCE
-            # =================================================
-
             distance = haversine_distance(
                 emergency.latitude,
                 emergency.longitude,
@@ -99,22 +104,12 @@ def emergency_response(emergency, db):
                 ambulance.longitude
             )
 
-            # =================================================
-            # ESTIMATE ARRIVAL TIME
-            #
-            # Average speed = 40 km/h
-            # =================================================
-
             estimated_minutes = round(
                 (distance / 40) * 60
             )
 
             if distance > 0 and estimated_minutes < 1:
                 estimated_minutes = 1
-
-            # =================================================
-            # AMBULANCE DATA
-            # =================================================
 
             ambulance_data = {
                 "id": ambulance.id,
@@ -124,7 +119,7 @@ def emergency_response(emergency, db):
                 "latitude": ambulance.latitude,
                 "longitude": ambulance.longitude,
                 "distance_km": round(distance, 2),
-                "estimated_arrival_minutes": estimated_minutes
+                "estimated_arrival_minutes": estimated_minutes,
             }
 
     # ========================================================
@@ -144,7 +139,6 @@ def emergency_response(emergency, db):
 
         "status": emergency.status,
 
-        # AI information
         "severity": severity,
         "priority_score": priority_score,
         "ai_reason": ai_reason,
@@ -156,7 +150,7 @@ def emergency_response(emergency, db):
 
         "hospital_id": emergency.hospital_id,
 
-        "created_at": emergency.created_at
+        "created_at": emergency.created_at,
     }
 
 
@@ -168,11 +162,15 @@ def emergency_response(emergency, db):
 @router.get("/emergencies")
 def get_emergencies(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
+    current_user: User = Depends(require_role("Admin")),
 ):
 
     emergencies = (
         db.query(Emergency)
+        .order_by(
+            Emergency.priority_score.desc(),
+            Emergency.created_at.asc()
+        )
         .all()
     )
 
@@ -185,7 +183,7 @@ def get_emergencies(
                 db
             )
             for emergency in emergencies
-        ]
+        ],
     }
 
 
@@ -197,7 +195,7 @@ def get_emergencies(
 @router.get("/emergencies/my")
 def get_my_emergencies(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
 
     emergencies = (
@@ -220,7 +218,7 @@ def get_my_emergencies(
                 db
             )
             for emergency in emergencies
-        ]
+        ],
     }
 
 
@@ -235,7 +233,7 @@ def get_my_emergencies(
 def create_emergency(
     emergency: EmergencyCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
 
     try:
@@ -284,7 +282,17 @@ def create_emergency(
         )
 
         # ====================================================
-        # 4. DETERMINE STATUS
+        # 4. CHECK HOSPITAL BED
+        # ====================================================
+
+        if (
+            assigned_hospital
+            and assigned_hospital.available_beds <= 0
+        ):
+            assigned_hospital = None
+
+        # ====================================================
+        # 5. DETERMINE STATUS
         # ====================================================
 
         if assigned_ambulance and assigned_hospital:
@@ -293,25 +301,14 @@ def create_emergency(
             emergency_status = "Pending"
 
         # ====================================================
-        # 5. RESERVE RESOURCES
+        # 6. RESERVE RESOURCES
         # ====================================================
 
         if assigned_ambulance and assigned_hospital:
 
             assigned_ambulance.status = "Busy"
 
-            if assigned_hospital.available_beds > 0:
-
-                assigned_hospital.available_beds -= 1
-
-            else:
-
-                assigned_ambulance.status = "Available"
-
-                assigned_ambulance = None
-                assigned_hospital = None
-
-                emergency_status = "Pending"
+            assigned_hospital.available_beds -= 1
 
         else:
 
@@ -319,7 +316,7 @@ def create_emergency(
             assigned_hospital = None
 
         # ====================================================
-        # 6. CREATE EMERGENCY
+        # 7. CREATE EMERGENCY
         # ====================================================
 
         new_emergency = Emergency(
@@ -338,6 +335,10 @@ def create_emergency(
 
             severity=severity,
 
+            priority_score=priority_score,
+
+            ai_reason=ai_reason,
+
             status=emergency_status,
 
             user_id=current_user.id,
@@ -352,13 +353,13 @@ def create_emergency(
                 assigned_hospital.id
                 if assigned_hospital
                 else None
-            )
+            ),
         )
 
         db.add(new_emergency)
 
         # ====================================================
-        # 7. COMMIT
+        # 8. COMMIT
         # ====================================================
 
         db.commit()
@@ -366,18 +367,17 @@ def create_emergency(
         db.refresh(new_emergency)
 
         # ====================================================
-        # 8. RESPONSE
+        # 9. RESPONSE
         # ====================================================
 
         return {
 
             "message": "Emergency created successfully",
 
-            # AI analysis
             "ai_analysis": {
                 "severity": severity,
                 "priority_score": priority_score,
-                "reason": ai_reason
+                "reason": ai_reason,
             },
 
             "ambulance": (
@@ -399,7 +399,7 @@ def create_emergency(
             "data": emergency_response(
                 new_emergency,
                 db
-            )
+            ),
         }
 
     except Exception as error:
@@ -420,7 +420,7 @@ def create_emergency(
 def get_emergency(
     emergency_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
 
     emergency = (
@@ -461,13 +461,6 @@ def get_emergency(
 # ============================================================
 # UPDATE EMERGENCY
 # ADMIN ONLY
-#
-# Supports:
-# - Status update
-# - Ambulance reassignment
-# - Hospital reassignment
-# - Automatic resource release
-# - Automatic resource reservation
 # ============================================================
 
 @router.put("/emergencies/{emergency_id}")
@@ -475,12 +468,8 @@ def update_emergency(
     emergency_id: int,
     emergency: EmergencyUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
+    current_user: User = Depends(require_role("Admin")),
 ):
-
-    # ========================================================
-    # FIND EMERGENCY
-    # ========================================================
 
     db_emergency = (
         db.query(Emergency)
@@ -497,10 +486,6 @@ def update_emergency(
             detail="Emergency not found"
         )
 
-    # ========================================================
-    # COMPLETED EMERGENCIES CANNOT BE MODIFIED
-    # ========================================================
-
     if db_emergency.status == "Completed":
 
         raise HTTPException(
@@ -509,33 +494,25 @@ def update_emergency(
         )
 
     # ========================================================
-    # UPDATE STATUS
+    # STATUS UPDATE
     # ========================================================
 
     if emergency.status is not None:
 
-        allowed_statuses = {
+        if emergency.status not in {
             "Pending",
             "Assigned"
-        }
-
-        if emergency.status not in allowed_statuses:
+        }:
 
             raise HTTPException(
                 status_code=400,
                 detail=(
                     "Invalid status. Allowed values: "
-                    "Pending, Assigned. "
-                    "Use /emergencies/{emergency_id}/complete "
-                    "to complete an emergency."
+                    "Pending, Assigned."
                 )
             )
 
         current_status = db_emergency.status
-
-        # ----------------------------------------------------
-        # Prevent invalid status transitions
-        # ----------------------------------------------------
 
         if (
             current_status == "Pending"
@@ -573,16 +550,7 @@ def update_emergency(
 
     if emergency.ambulance_id is not None:
 
-        # ----------------------------------------------------
-        # If the same ambulance is already assigned,
-        # there is nothing to change.
-        # ----------------------------------------------------
-
         if emergency.ambulance_id != db_emergency.ambulance_id:
-
-            # ------------------------------------------------
-            # FIND NEW AMBULANCE
-            # ------------------------------------------------
 
             new_ambulance = (
                 db.query(Ambulance)
@@ -600,10 +568,6 @@ def update_emergency(
                     detail="Selected ambulance not found"
                 )
 
-            # ------------------------------------------------
-            # CHECK AVAILABILITY
-            # ------------------------------------------------
-
             if new_ambulance.status != "Available":
 
                 raise HTTPException(
@@ -611,9 +575,7 @@ def update_emergency(
                     detail="Selected ambulance is not available"
                 )
 
-            # ------------------------------------------------
-            # RELEASE OLD AMBULANCE
-            # ------------------------------------------------
+            # Release old ambulance
 
             if db_emergency.ambulance_id is not None:
 
@@ -630,15 +592,9 @@ def update_emergency(
 
                     old_ambulance.status = "Available"
 
-            # ------------------------------------------------
-            # RESERVE NEW AMBULANCE
-            # ------------------------------------------------
+            # Reserve new ambulance
 
             new_ambulance.status = "Busy"
-
-            # ------------------------------------------------
-            # UPDATE EMERGENCY
-            # ------------------------------------------------
 
             db_emergency.ambulance_id = new_ambulance.id
 
@@ -648,16 +604,7 @@ def update_emergency(
 
     if emergency.hospital_id is not None:
 
-        # ----------------------------------------------------
-        # If the same hospital is already assigned,
-        # there is nothing to change.
-        # ----------------------------------------------------
-
         if emergency.hospital_id != db_emergency.hospital_id:
-
-            # ------------------------------------------------
-            # FIND NEW HOSPITAL
-            # ------------------------------------------------
 
             new_hospital = (
                 db.query(Hospital)
@@ -675,20 +622,12 @@ def update_emergency(
                     detail="Selected hospital not found"
                 )
 
-            # ------------------------------------------------
-            # CHECK HOSPITAL STATUS
-            # ------------------------------------------------
-
             if new_hospital.status != "Available":
 
                 raise HTTPException(
                     status_code=400,
                     detail="Selected hospital is not available"
                 )
-
-            # ------------------------------------------------
-            # CHECK BED AVAILABILITY
-            # ------------------------------------------------
 
             if new_hospital.available_beds <= 0:
 
@@ -697,9 +636,7 @@ def update_emergency(
                     detail="Selected hospital has no available beds"
                 )
 
-            # ------------------------------------------------
-            # RELEASE OLD HOSPITAL BED
-            # ------------------------------------------------
+            # Release old hospital bed
 
             if db_emergency.hospital_id is not None:
 
@@ -716,25 +653,15 @@ def update_emergency(
 
                     old_hospital.available_beds += 1
 
-            # ------------------------------------------------
-            # RESERVE NEW HOSPITAL BED
-            # ------------------------------------------------
+            # Reserve new hospital bed
 
             new_hospital.available_beds -= 1
-
-            # ------------------------------------------------
-            # UPDATE EMERGENCY
-            # ------------------------------------------------
 
             db_emergency.hospital_id = new_hospital.id
 
     # ========================================================
     # AUTOMATIC STATUS
     # ========================================================
-
-    # If both ambulance and hospital are assigned,
-    # automatically mark the emergency as Assigned
-    # when it was previously Pending.
 
     if (
         db_emergency.ambulance_id is not None
@@ -745,7 +672,7 @@ def update_emergency(
         db_emergency.status = "Assigned"
 
     # ========================================================
-    # SAVE CHANGES
+    # SAVE
     # ========================================================
 
     try:
@@ -762,10 +689,6 @@ def update_emergency(
             status_code=500,
             detail="Failed to update emergency"
         )
-
-    # ========================================================
-    # RESPONSE
-    # ========================================================
 
     return {
 
@@ -787,7 +710,7 @@ def update_emergency(
 def delete_emergency(
     emergency_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
+    current_user: User = Depends(require_role("Admin")),
 ):
 
     db_emergency = (
@@ -809,9 +732,11 @@ def delete_emergency(
     # RELEASE AMBULANCE
     # ========================================================
 
+    released_ambulance = None
+
     if db_emergency.ambulance_id is not None:
 
-        ambulance = (
+        released_ambulance = (
             db.query(Ambulance)
             .filter(
                 Ambulance.id ==
@@ -820,9 +745,9 @@ def delete_emergency(
             .first()
         )
 
-        if ambulance:
+        if released_ambulance:
 
-            ambulance.status = "Available"
+            released_ambulance.status = "Available"
 
     # ========================================================
     # RELEASE HOSPITAL BED
@@ -844,6 +769,19 @@ def delete_emergency(
             hospital.available_beds += 1
 
     # ========================================================
+    # AUTOMATICALLY ASSIGN RELEASED AMBULANCE
+    # ========================================================
+
+    next_emergency = None
+
+    if released_ambulance:
+
+        next_emergency = assign_ambulance_to_next_emergency(
+            db,
+            released_ambulance
+        )
+
+    # ========================================================
     # DELETE
     # ========================================================
 
@@ -863,20 +801,30 @@ def delete_emergency(
         )
 
     return {
-        "message": "Emergency deleted successfully"
+        "message": "Emergency deleted successfully",
+
+        "next_emergency_assigned": (
+            next_emergency.id
+            if next_emergency
+            else None
+        ),
     }
 
 
 # ============================================================
 # COMPLETE EMERGENCY
 # ADMIN ONLY
+#
+# IMPORTANT:
+# When the ambulance becomes available, the system
+# automatically assigns it to the next pending emergency.
 # ============================================================
 
 @router.put("/emergencies/{emergency_id}/complete")
 def complete_emergency(
     emergency_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("Admin"))
+    current_user: User = Depends(require_role("Admin")),
 ):
 
     # ========================================================
@@ -912,12 +860,14 @@ def complete_emergency(
     try:
 
         # ====================================================
-        # RELEASE AMBULANCE
+        # SAVE AMBULANCE REFERENCE
         # ====================================================
+
+        released_ambulance = None
 
         if emergency.ambulance_id is not None:
 
-            ambulance = (
+            released_ambulance = (
                 db.query(Ambulance)
                 .filter(
                     Ambulance.id ==
@@ -926,14 +876,15 @@ def complete_emergency(
                 .first()
             )
 
-            if ambulance:
+        # ====================================================
+        # RELEASE AMBULANCE
+        # ====================================================
 
-                # Only release the ambulance if it is
-                # currently assigned/busy.
+        if released_ambulance:
 
-                if ambulance.status == "Busy":
+            if released_ambulance.status == "Busy":
 
-                    ambulance.status = "Available"
+                released_ambulance.status = "Available"
 
         # ====================================================
         # RELEASE HOSPITAL BED
@@ -952,40 +903,95 @@ def complete_emergency(
 
             if hospital:
 
-                # A completed emergency releases exactly
-                # one previously reserved bed.
-
                 hospital.available_beds += 1
 
         # ====================================================
-        # MARK COMPLETED
+        # MARK CURRENT EMERGENCY COMPLETED
         # ====================================================
 
         emergency.status = "Completed"
+
+        # ====================================================
+        # AUTOMATICALLY ASSIGN RELEASED AMBULANCE
+        #
+        # Priority:
+        #   1. Critical
+        #   2. High
+        #   3. Medium
+        #   4. Low
+        #
+        # If same priority:
+        # oldest emergency first.
+        # ====================================================
+
+        assigned_next_emergency = None
+
+        if released_ambulance:
+
+            assigned_next_emergency = (
+                assign_ambulance_to_next_emergency(
+                    db,
+                    released_ambulance
+                )
+            )
+
+        # ====================================================
+        # COMMIT EVERYTHING TOGETHER
+        # ====================================================
 
         db.commit()
 
         db.refresh(emergency)
 
-    except Exception:
+        if assigned_next_emergency:
+
+            db.refresh(
+                assigned_next_emergency
+            )
+
+        # ====================================================
+        # RESPONSE
+        # ====================================================
+
+        return {
+
+            "message": "Emergency completed successfully",
+
+            "ambulance_released": (
+                released_ambulance.id
+                if released_ambulance
+                else None
+            ),
+
+            "next_emergency_assigned": (
+                assigned_next_emergency.id
+                if assigned_next_emergency
+                else None
+            ),
+
+            "data": emergency_response(
+                emergency,
+                db
+            ),
+
+            "next_emergency": (
+                emergency_response(
+                    assigned_next_emergency,
+                    db
+                )
+                if assigned_next_emergency
+                else None
+            ),
+        }
+
+    except Exception as error:
 
         db.rollback()
 
         raise HTTPException(
             status_code=500,
-            detail="Failed to complete emergency"
+            detail=(
+                "Failed to complete emergency: "
+                f"{str(error)}"
+            )
         )
-
-    # ========================================================
-    # RESPONSE
-    # ========================================================
-
-    return {
-
-        "message": "Emergency completed successfully",
-
-        "data": emergency_response(
-            emergency,
-            db
-        )
-    }

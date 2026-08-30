@@ -1,100 +1,47 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  apiGet,
-} from "../api";
+import { Link } from "react-router-dom";
+import { apiGet, apiPut } from "../api/api";
 
-function EmergencyDetails({
-  emergencyId,
-  onLogout,
-  onNavigate,
-}) {
-  const [emergency, setEmergency] =
-    useState(null);
 
-  const [loading, setLoading] =
-    useState(true);
+// ============================================================
+// EMERGENCY DETAILS
+// ============================================================
 
-  const [error, setError] =
-    useState("");
+export default function EmergencyDetails() {
+  const { emergencyId } = getEmergencyId();
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [emergency, setEmergency] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
 
-  // ============================================================
-  // NAVIGATION
-  // ============================================================
-
-  const goBack = () => {
-    if (typeof onNavigate === "function") {
-      onNavigate("/emergencies");
-      return;
-    }
-
-    window.location.assign("/emergencies");
-  };
-
-  // ============================================================
-  // LOGOUT
-  // ============================================================
-
-  const logout = () => {
-    if (typeof onLogout === "function") {
-      onLogout();
-      return;
-    }
-
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("token");
-    localStorage.removeItem("user_role");
-    localStorage.removeItem("user_email");
-
-    window.location.assign("/");
-  };
-
-  // ============================================================
+  // ==========================================================
   // LOAD EMERGENCY
-  // ============================================================
+  // ==========================================================
 
   const loadEmergency = useCallback(
-    async (showSpinner = true) => {
+    async (showRefresh = false) => {
+      if (!emergencyId) {
+        return;
+      }
+
+      if (showRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       try {
-        if (showSpinner) {
-          setLoading(true);
-        } else {
-          setRefreshing(true);
-        }
-
-        setError("");
-
-        if (
-          emergencyId === null ||
-          emergencyId === undefined ||
-          emergencyId === ""
-        ) {
-          throw new Error(
-            "Emergency ID is missing."
-          );
-        }
-
         const data = await apiGet(
-          `/emergencies/${encodeURIComponent(
-            emergencyId
-          )}`
+          `/emergencies/${emergencyId}`
         );
 
-        setEmergency(
-          data?.emergency || data
-        );
+        setEmergency(data);
+        setError("");
       } catch (err) {
-        console.error(
-          "Emergency details error:",
-          err
-        );
-
         setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load emergency details."
+          err?.message ||
+            "Failed to load emergency details."
         );
       } finally {
         setLoading(false);
@@ -104,52 +51,38 @@ function EmergencyDetails({
     [emergencyId]
   );
 
-  // ============================================================
+  // ==========================================================
   // INITIAL LOAD
-  // ============================================================
+  // ==========================================================
 
   useEffect(() => {
+    if (!emergencyId) {
+      return;
+    }
+
     let cancelled = false;
 
-    const loadOnMount = async () => {
+    const fetchEmergency = async () => {
       try {
-        setLoading(true);
-        setError("");
-
-        if (
-          emergencyId === null ||
-          emergencyId === undefined ||
-          emergencyId === ""
-        ) {
-          throw new Error(
-            "Emergency ID is missing."
-          );
-        }
-
         const data = await apiGet(
-          `/emergencies/${encodeURIComponent(
-            emergencyId
-          )}`
+          `/emergencies/${emergencyId}`
         );
 
-        if (!cancelled) {
-          setEmergency(
-            data?.emergency || data
-          );
+        if (cancelled) {
+          return;
         }
+
+        setEmergency(data);
+        setError("");
       } catch (err) {
-        console.error(
-          "Emergency details error:",
-          err
-        );
-
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load emergency details."
-          );
+        if (cancelled) {
+          return;
         }
+
+        setError(
+          err?.message ||
+            "Failed to load emergency details."
+        );
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -157,739 +90,663 @@ function EmergencyDetails({
       }
     };
 
-    loadOnMount();
+    void fetchEmergency();
 
     return () => {
       cancelled = true;
     };
   }, [emergencyId]);
 
-  // ============================================================
-  // VALUE HELPERS
-  // ============================================================
+  // ==========================================================
+  // MISSING EMERGENCY ID
+  // ==========================================================
 
-  const value = (
-    key,
-    fallback = "Not available"
-  ) => {
-    const item = emergency?.[key];
+  if (!emergencyId) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Header />
 
-    return item === null ||
-      item === undefined ||
-      item === ""
-      ? fallback
-      : item;
-  };
+        <main className="mx-auto max-w-4xl px-6 py-10">
+          <div className="rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
+            <h1 className="text-xl font-bold text-slate-900">
+              Emergency ID is missing
+            </h1>
 
-  const formatDate = (dateString) => {
-    if (!dateString) {
-      return "Not available";
-    }
+            <p className="mt-2 text-sm text-slate-500">
+              Unable to load emergency details because
+              no emergency ID was provided.
+            </p>
 
-    const date = new Date(dateString);
+            <Link
+              to="/emergencies"
+              className="mt-6 inline-block rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Back to Emergencies
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-    return Number.isNaN(date.getTime())
-      ? String(dateString)
-      : date.toLocaleString();
-  };
-
-  // ============================================================
-  // BADGES
-  // ============================================================
-
-  const badgeClass = (
-    type,
-    rawValue
-  ) => {
-    const normalized = String(
-      rawValue || ""
-    ).toLowerCase();
-
-    if (type === "status") {
-      if (normalized === "completed") {
-        return "badge completed";
-      }
-
-      if (normalized === "assigned") {
-        return "badge assigned";
-      }
-
-      return "badge pending";
-    }
-
-    if (normalized === "critical") {
-      return "badge critical";
-    }
-
-    if (normalized === "high") {
-      return "badge high";
-    }
-
-    if (normalized === "medium") {
-      return "badge medium";
-    }
-
-    return "badge low";
-  };
-
-  // ============================================================
+  // ==========================================================
   // LOADING
-  // ============================================================
+  // ==========================================================
 
   if (loading) {
     return (
-      <main style={pageStyle}>
-        <div style={loadingCardStyle}>
-          Loading emergency details...
-        </div>
-      </main>
-    );
-  }
+      <div className="min-h-screen bg-slate-50">
+        <Header />
 
-  // ============================================================
-  // ERROR
-  // ============================================================
+        <main className="mx-auto max-w-4xl px-6 py-10">
+          <div className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-700" />
 
-  if (error || !emergency) {
-    return (
-      <main style={pageStyle}>
-        <div style={topBarStyle}>
-
-          <button
-            type="button"
-            onClick={goBack}
-            style={secondaryButtonStyle}
-          >
-            ← Back to Emergencies
-          </button>
-
-          <button
-            type="button"
-            onClick={logout}
-            style={logoutButtonStyle}
-          >
-            Logout
-          </button>
-
-        </div>
-
-        <section style={errorCardStyle}>
-
-          <div style={{ fontSize: "36px" }}>
-            ⚠️
+            <p className="mt-4 text-sm text-slate-500">
+              Loading emergency details...
+            </p>
           </div>
-
-          <h2 style={{ margin: "8px 0" }}>
-            Unable to load emergency
-          </h2>
-
-          <p
-            style={{
-              color: "#6b7280",
-            }}
-          >
-            {error ||
-              "Emergency not found."}
-          </p>
-
-          <button
-            type="button"
-            onClick={() =>
-              loadEmergency(true)
-            }
-            style={primaryButtonStyle}
-          >
-            ↻ Try Again
-          </button>
-
-        </section>
-      </main>
+        </main>
+      </div>
     );
   }
 
-  // ============================================================
-  // DATA
-  // ============================================================
+  // ==========================================================
+  // ERROR
+  // ==========================================================
 
-  const status = value("status");
-  const severity = value("severity");
+  if (error && !emergency) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Header />
 
-  const ambulance =
-    emergency.ambulance || null;
+        <main className="mx-auto max-w-4xl px-6 py-10">
+          <div className="rounded-xl border border-red-200 bg-white p-8 shadow-sm">
+            <h1 className="text-xl font-bold text-red-700">
+              Unable to load emergency
+            </h1>
 
-  // ============================================================
-  // PAGE
-  // ============================================================
+            <p className="mt-2 text-sm text-slate-600">
+              {error}
+            </p>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => loadEmergency()}
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Try Again
+              </button>
+
+              <Link
+                to="/emergencies"
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Back to Emergencies
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ==========================================================
+  // NO DATA
+  // ==========================================================
+
+  if (!emergency) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Header />
+
+        <main className="mx-auto max-w-4xl px-6 py-10">
+          <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <h1 className="text-xl font-bold text-slate-900">
+              Emergency not found
+            </h1>
+
+            <Link
+              to="/emergencies"
+              className="mt-6 inline-block rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+            >
+              Back to Emergencies
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ==========================================================
+  // EMERGENCY VALUES
+  // ==========================================================
+
+  const ambulance = emergency.ambulance;
+
+  const severity =
+    emergency.severity || "Medium";
+
+  const emergencyStatus =
+    emergency.status || "Pending";
+
+  const priorityScore =
+    emergency.priority_score ?? 50;
+
+  const aiReason =
+    emergency.ai_reason ||
+    "Emergency classified based on available information.";
+
+  const distance =
+    emergency.distance_km ??
+    ambulance?.distance_km ??
+    null;
+
+  const eta =
+    emergency.estimated_arrival_minutes ??
+    ambulance?.estimated_arrival_minutes ??
+    null;
+
+  // ==========================================================
+  // STATUS CLASS
+  // ==========================================================
+
+  const getStatusClass = () => {
+    if (emergencyStatus === "Completed") {
+      return "bg-green-100 text-green-700";
+    }
+
+    if (emergencyStatus === "Assigned") {
+      return "bg-blue-100 text-blue-700";
+    }
+
+    return "bg-yellow-100 text-yellow-700";
+  };
+
+  // ==========================================================
+  // SEVERITY CLASS
+  // ==========================================================
+
+  const getSeverityClass = () => {
+    if (severity === "Critical") {
+      return "text-red-600";
+    }
+
+    if (severity === "High") {
+      return "text-orange-600";
+    }
+
+    if (severity === "Low") {
+      return "text-green-600";
+    }
+
+    return "text-yellow-600";
+  };
+
+  // ==========================================================
+  // COMPLETE EMERGENCY
+  // ==========================================================
+
+  const completeEmergency = async () => {
+    if (emergencyStatus === "Completed") {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to mark this emergency as completed?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+
+    try {
+      await apiPut(
+        `/emergencies/${emergencyId}/complete`
+      );
+
+      await loadEmergency();
+    } catch (err) {
+      setError(
+        err?.message ||
+          "Failed to complete emergency."
+      );
+    }
+  };
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
-    <main style={pageStyle}>
+    <div className="min-h-screen bg-slate-50">
+      <Header />
 
-      {/* HEADER */}
+      <main className="mx-auto max-w-4xl px-6 py-8">
 
-      <header style={topBarStyle}>
+        {/* ================================================== */}
+        {/* PAGE HEADER */}
+        {/* ================================================== */}
 
-        <div>
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <Link
+              to="/emergencies"
+              className="text-sm font-medium text-slate-600 hover:text-slate-900"
+            >
+              ← Back to Emergencies
+            </Link>
 
-          <div style={brandStyle}>
-            RapidResQ AI 🚑
+            <h1 className="mt-3 text-2xl font-bold text-slate-900">
+              Emergency #
+              {String(emergency.id).padStart(3, "0")}
+            </h1>
+
+            <p className="text-sm text-slate-500">
+              Complete emergency response information
+            </p>
           </div>
 
-          <div
-            style={{
-              fontSize: "11px",
-              color: "#6b7280",
-            }}
+          <button
+            type="button"
+            onClick={() => loadEmergency(true)}
+            disabled={refreshing}
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Emergency Details
+            {refreshing
+              ? "Refreshing..."
+              : "↻ Refresh"}
+          </button>
+        </div>
+
+        {/* ================================================== */}
+        {/* ERROR */}
+        {/* ================================================== */}
+
+        {error && emergency && (
+          <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* EMERGENCY STATUS */}
+        {/* ================================================== */}
+
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <SectionTitle title="Emergency Status" />
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass()}`}
+            >
+              {emergencyStatus}
+            </span>
+
+            <span
+              className={`text-sm font-semibold ${getSeverityClass()}`}
+            >
+              {severity} Severity
+            </span>
           </div>
 
+          <p className="mt-3 text-sm font-medium text-slate-900">
+            {emergency.emergency_type}
+          </p>
+
+          {emergency.location && (
+            <p className="mt-1 text-sm text-slate-500">
+              {emergency.location}
+            </p>
+          )}
+        </section>
+
+        {/* ================================================== */}
+        {/* PATIENT INFORMATION */}
+        {/* ================================================== */}
+
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <SectionTitle title="Patient Information" />
+
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <InfoBox
+              label="Patient Name"
+              value={emergency.patient_name}
+            />
+
+            <InfoBox
+              label="Phone"
+              value={emergency.phone}
+            />
+
+            <InfoBox
+              label="User ID"
+              value={emergency.user_id}
+            />
+
+            <InfoBox
+              label="Created"
+              value={formatDate(emergency.created_at)}
+            />
+          </div>
+        </section>
+
+        {/* ================================================== */}
+        {/* EMERGENCY LOCATION */}
+        {/* ================================================== */}
+
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <SectionTitle title="Emergency Location" />
+
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <InfoBox
+              label="Location"
+              value={emergency.location}
+            />
+
+            <InfoBox
+              label="Latitude"
+              value={emergency.latitude}
+            />
+
+            <InfoBox
+              label="Longitude"
+              value={emergency.longitude}
+            />
+          </div>
+        </section>
+
+        {/* ================================================== */}
+        {/* AMBULANCE */}
+        {/* ================================================== */}
+
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <SectionTitle title="Assigned Ambulance" />
+
+          {ambulance ? (
+            <div className="mt-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <InfoBox
+                  label="Vehicle"
+                  value={ambulance.vehicle}
+                />
+
+                <InfoBox
+                  label="Status"
+                  value={ambulance.status}
+                />
+
+                <InfoBox
+                  label="Location"
+                  value={ambulance.location}
+                />
+
+                <InfoBox
+                  label="Ambulance ID"
+                  value={ambulance.id}
+                />
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <InfoBox
+                  label="Distance"
+                  value={
+                    distance !== null
+                      ? `${distance} km`
+                      : "Not available"
+                  }
+                />
+
+                <InfoBox
+                  label="Estimated Arrival"
+                  value={
+                    eta !== null
+                      ? `${eta} minutes`
+                      : "Not available"
+                  }
+                />
+
+                <InfoBox
+                  label="GPS"
+                  value={`${ambulance.latitude}, ${ambulance.longitude}`}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center">
+              <p className="text-sm font-medium text-slate-600">
+                🚑 Ambulance not assigned yet
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                The system will automatically assign
+                the next available ambulance.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* ================================================== */}
+        {/* HOSPITAL */}
+        {/* ================================================== */}
+
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <SectionTitle title="Hospital Assignment" />
+
+          {emergency.hospital_id ? (
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <InfoBox
+                label="Hospital ID"
+                value={emergency.hospital_id}
+              />
+
+              <InfoBox
+                label="Assignment Status"
+                value="Assigned"
+              />
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <InfoBox
+                label="Hospital ID"
+                value="Not available"
+              />
+
+              <InfoBox
+                label="Assignment Status"
+                value="Pending Assignment"
+              />
+            </div>
+          )}
+        </section>
+
+        {/* ================================================== */}
+        {/* AI ANALYSIS */}
+        {/* ================================================== */}
+
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <SectionTitle title="AI Emergency Analysis" />
+
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <InfoBox
+              label="Severity"
+              value={severity}
+            />
+
+            <InfoBox
+              label="Priority Score"
+              value={priorityScore}
+            />
+          </div>
+
+          <div className="mt-3 rounded-lg bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              AI Reason
+            </p>
+
+            <p className="mt-1 text-sm text-slate-700">
+              {aiReason}
+            </p>
+          </div>
+        </section>
+
+        {/* ================================================== */}
+        {/* ACTIONS */}
+        {/* ================================================== */}
+
+        {emergencyStatus === "Assigned" && (
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <SectionTitle title="Emergency Actions" />
+
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={completeEmergency}
+                className="rounded-md bg-green-600 px-5 py-2 text-sm font-semibold text-white hover:bg-green-700"
+              >
+                Mark Emergency Completed
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* ================================================== */}
+        {/* COMPLETED */}
+        {/* ================================================== */}
+
+        {emergencyStatus === "Completed" && (
+          <section className="rounded-xl border border-green-200 bg-green-50 p-5">
+            <p className="text-sm font-semibold text-green-700">
+              ✓ This emergency has been completed.
+            </p>
+
+            <p className="mt-1 text-xs text-green-600">
+              The assigned ambulance and hospital
+              resources have been released.
+            </p>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+
+// ============================================================
+// GET EMERGENCY ID
+// ============================================================
+
+function getEmergencyId() {
+  const params = new URLSearchParams(
+    window.location.search
+  );
+
+  const pathParts =
+    window.location.pathname
+      .split("/")
+      .filter(Boolean);
+
+  const emergencyId =
+    pathParts[pathParts.length - 1] ||
+    params.get("emergencyId");
+
+  return {
+    emergencyId,
+  };
+}
+
+
+// ============================================================
+// HEADER
+// ============================================================
+
+function Header() {
+  return (
+    <header className="border-b border-slate-200 bg-white">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">
+            RapidResQ AI 🚑
+          </h2>
+
+          <p className="text-xs text-slate-500">
+            Emergency Details
+          </p>
         </div>
 
         <button
           type="button"
-          onClick={logout}
-          style={logoutButtonStyle}
+          onClick={() => {
+            localStorage.removeItem(
+              "access_token"
+            );
+            localStorage.removeItem("token");
+
+            window.location.href = "/login";
+          }}
+          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           Logout
         </button>
-
-      </header>
-
-      <div style={contentStyle}>
-
-        {/* HEADING */}
-
-        <div style={headingRowStyle}>
-
-          <div>
-
-            <button
-              type="button"
-              onClick={goBack}
-              style={secondaryButtonStyle}
-            >
-              ← Back to Emergencies
-            </button>
-
-            <h1 style={titleStyle}>
-              Emergency #
-              {String(
-                value(
-                  "id",
-                  emergencyId
-                )
-              ).padStart(3, "0")}
-            </h1>
-
-            <p style={subtitleStyle}>
-              Complete emergency response
-              information
-            </p>
-
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              loadEmergency(false)
-            }
-            disabled={refreshing}
-            style={{
-              ...secondaryButtonStyle,
-              opacity: refreshing
-                ? 0.65
-                : 1,
-              cursor: refreshing
-                ? "not-allowed"
-                : "pointer",
-            }}
-          >
-            {refreshing
-              ? "↻ Refreshing..."
-              : "↻ Refresh"}
-          </button>
-
-        </div>
-
-        {/* EMERGENCY STATUS */}
-
-        <section style={cardStyle}>
-
-          <SectionTitle label="Emergency Status" />
-
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              flexWrap: "wrap",
-              marginBottom: "12px",
-            }}
-          >
-
-            <span
-              className={badgeClass(
-                "status",
-                status
-              )}
-            >
-              {status}
-            </span>
-
-            <span
-              className={badgeClass(
-                "severity",
-                severity
-              )}
-            >
-              {severity} Severity
-            </span>
-
-          </div>
-
-          <strong
-            style={{
-              fontSize: "16px",
-            }}
-          >
-            {value(
-              "emergency_type"
-            )}
-          </strong>
-
-          <div style={mutedStyle}>
-            {value("location")}
-          </div>
-
-        </section>
-
-        {/* PATIENT */}
-
-        <section style={cardStyle}>
-
-          <SectionTitle
-            label="Patient Information"
-          />
-
-          <div style={gridStyle}>
-
-            <Info
-              label="Patient Name"
-              value={value(
-                "patient_name"
-              )}
-            />
-
-            <Info
-              label="Phone"
-              value={value("phone")}
-            />
-
-            <Info
-              label="User ID"
-              value={value("user_id")}
-            />
-
-            <Info
-              label="Created"
-              value={formatDate(
-                emergency.created_at
-              )}
-            />
-
-          </div>
-
-        </section>
-
-        {/* LOCATION */}
-
-        <section style={cardStyle}>
-
-          <SectionTitle
-            label="Emergency Location"
-          />
-
-          <div style={gridStyle}>
-
-            <Info
-              label="Location"
-              value={value("location")}
-            />
-
-            <Info
-              label="Latitude"
-              value={value("latitude")}
-            />
-
-            <Info
-              label="Longitude"
-              value={value("longitude")}
-            />
-
-          </div>
-
-        </section>
-
-        {/* AMBULANCE */}
-
-        <section style={cardStyle}>
-
-          <SectionTitle
-            label="Assigned Ambulance"
-          />
-
-          {ambulance ? (
-            <>
-
-              <h2
-                style={{
-                  margin: "0 0 14px",
-                  fontSize: "20px",
-                }}
-              >
-                🚑{" "}
-                {valueFrom(
-                  ambulance,
-                  "vehicle"
-                )}
-              </h2>
-
-              <div style={gridStyle}>
-
-                <Info
-                  label="Ambulance ID"
-                  value={valueFrom(
-                    ambulance,
-                    "id"
-                  )}
-                />
-
-                <Info
-                  label="Vehicle"
-                  value={valueFrom(
-                    ambulance,
-                    "vehicle"
-                  )}
-                />
-
-                <Info
-                  label="Status"
-                  value={valueFrom(
-                    ambulance,
-                    "status"
-                  )}
-                />
-
-                <Info
-                  label="Location"
-                  value={valueFrom(
-                    ambulance,
-                    "location"
-                  )}
-                />
-
-                <Info
-                  label="Latitude"
-                  value={valueFrom(
-                    ambulance,
-                    "latitude"
-                  )}
-                />
-
-                <Info
-                  label="Longitude"
-                  value={valueFrom(
-                    ambulance,
-                    "longitude"
-                  )}
-                />
-
-                <Info
-                  label="Distance"
-                  value={valueFrom(
-                    ambulance,
-                    "distance_km"
-                  )}
-                  suffix=" km"
-                />
-
-                <Info
-                  label="Estimated Arrival"
-                  value={valueFrom(
-                    ambulance,
-                    "estimated_arrival_minutes"
-                  )}
-                  suffix=" minutes"
-                />
-
-              </div>
-
-            </>
-          ) : (
-            <div
-              style={notAssignedStyle}
-            >
-              🚑 Ambulance not assigned yet
-            </div>
-          )}
-
-        </section>
-
-        {/* HOSPITAL */}
-
-        <section style={cardStyle}>
-
-          <SectionTitle
-            label="Hospital Assignment"
-          />
-
-          <div style={gridStyle}>
-
-            <Info
-              label="Hospital ID"
-              value={value(
-                "hospital_id"
-              )}
-            />
-
-            <Info
-              label="Assignment Status"
-              value={
-                emergency.hospital_id
-                  ? "Hospital Assigned"
-                  : "Pending Assignment"
-              }
-            />
-
-          </div>
-
-        </section>
-
       </div>
-
-    </main>
+    </header>
   );
 }
 
+
 // ============================================================
-// HELPERS
+// SECTION TITLE
 // ============================================================
 
-function valueFrom(
-  object,
-  key,
-  fallback = "Not available"
-) {
-  const item = object?.[key];
-
-  return item === null ||
-    item === undefined ||
-    item === ""
-    ? fallback
-    : item;
-}
-
-function SectionTitle({ label }) {
+function SectionTitle({ title }) {
   return (
-    <div style={sectionLabelStyle}>
-      {label}
-    </div>
+    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+      {title}
+    </h2>
   );
 }
 
-function Info({
-  label,
-  value,
-  suffix = "",
-}) {
-  return (
-    <div style={infoStyle}>
 
-      <div style={infoLabelStyle}>
+// ============================================================
+// INFO BOX
+// ============================================================
+
+function InfoBox({ label, value }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs text-slate-500">
         {label}
-      </div>
+      </p>
 
-      <div style={infoValueStyle}>
-        {value}
-        {value !== "Not available"
-          ? suffix
-          : ""}
-      </div>
-
+      <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+        {value !== null &&
+        value !== undefined &&
+        value !== ""
+          ? value
+          : "Not available"}
+      </p>
     </div>
   );
 }
 
+
 // ============================================================
-// STYLES
+// DATE FORMATTER
 // ============================================================
 
-const pageStyle = {
-  minHeight: "100vh",
-  background: "#f4f7fb",
-  color: "#111827",
-  fontFamily: "Arial, sans-serif",
-};
+function formatDate(value) {
+  if (!value) {
+    return "Not available";
+  }
 
-const topBarStyle = {
-  height: "74px",
-  padding: "0 5%",
-  boxSizing: "border-box",
-  background: "#ffffff",
-  borderBottom:
-    "1px solid #e5e7eb",
-  display: "flex",
-  alignItems: "center",
-  justifyContent:
-    "space-between",
-};
+  const date = new Date(value);
 
-const brandStyle = {
-  fontSize: "18px",
-  fontWeight: "800",
-};
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
 
-const contentStyle = {
-  width: "min(920px, 92%)",
-  margin: "0 auto",
-  padding: "28px 0 50px",
-};
-
-const headingRowStyle = {
-  display: "flex",
-  alignItems: "flex-end",
-  justifyContent:
-    "space-between",
-  gap: "16px",
-  marginBottom: "18px",
-};
-
-const titleStyle = {
-  margin: "14px 0 4px",
-  fontSize: "26px",
-};
-
-const subtitleStyle = {
-  margin: 0,
-  color: "#6b7280",
-  fontSize: "13px",
-};
-
-const cardStyle = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: "12px",
-  padding: "20px",
-  marginBottom: "16px",
-  boxShadow:
-    "0 3px 12px rgba(0,0,0,0.04)",
-};
-
-const sectionLabelStyle = {
-  color: "#64748b",
-  textTransform: "uppercase",
-  letterSpacing: "1px",
-  fontSize: "11px",
-  fontWeight: "800",
-  marginBottom: "12px",
-};
-
-const gridStyle = {
-  display: "grid",
-  gridTemplateColumns:
-    "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: "10px",
-};
-
-const infoStyle = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  borderRadius: "8px",
-  padding: "12px",
-};
-
-const infoLabelStyle = {
-  color: "#64748b",
-  fontSize: "11px",
-  marginBottom: "6px",
-};
-
-const infoValueStyle = {
-  fontWeight: "700",
-  fontSize: "14px",
-  wordBreak: "break-word",
-};
-
-const mutedStyle = {
-  color: "#6b7280",
-  fontSize: "13px",
-  marginTop: "4px",
-};
-
-const secondaryButtonStyle = {
-  minHeight: "38px",
-  padding: "0 14px",
-  border:
-    "1px solid #d1d5db",
-  borderRadius: "8px",
-  background: "#ffffff",
-  color: "#374151",
-  fontWeight: "700",
-  cursor: "pointer",
-};
-
-const primaryButtonStyle = {
-  minHeight: "40px",
-  padding: "0 16px",
-  border:
-    "1px solid #dc2626",
-  borderRadius: "8px",
-  background: "#dc2626",
-  color: "#ffffff",
-  fontWeight: "700",
-  cursor: "pointer",
-};
-
-const logoutButtonStyle = {
-  minHeight: "36px",
-  padding: "0 13px",
-  border:
-    "1px solid #d1d5db",
-  borderRadius: "7px",
-  background: "#ffffff",
-  fontWeight: "600",
-  cursor: "pointer",
-};
-
-const loadingCardStyle = {
-  width: "min(700px, 90%)",
-  margin: "20vh auto",
-  background: "#ffffff",
-  border:
-    "1px solid #e5e7eb",
-  borderRadius: "12px",
-  padding: "35px",
-  textAlign: "center",
-};
-
-const errorCardStyle = {
-  width: "min(650px, 90%)",
-  margin: "14vh auto",
-  background: "#ffffff",
-  border:
-    "1px solid #fecaca",
-  borderRadius: "12px",
-  padding: "35px",
-  textAlign: "center",
-};
-
-const notAssignedStyle = {
-  padding: "28px",
-  border:
-    "1px dashed #cbd5e1",
-  borderRadius: "10px",
-  textAlign: "center",
-  color: "#64748b",
-  fontWeight: "700",
-};
-
-export default EmergencyDetails;
+  return date.toLocaleString();
+}

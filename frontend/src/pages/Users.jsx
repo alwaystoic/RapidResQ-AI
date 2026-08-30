@@ -1,43 +1,39 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiDelete, apiGet, apiPost, apiPut } from "../api";
 import "./Users.css";
 
+import {
+  apiGet,
+  apiPut,
+  apiDelete,
+} from "../api/api";
 
 function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Edit user
+  // =========================================================
+  // EDIT USER
+  // =========================================================
+
   const [editingUser, setEditingUser] = useState(null);
+
   const [editForm, setEditForm] = useState({
     full_name: "",
     email: "",
     phone: "",
     password: "",
-    role: "Citizen",
+    role: "",
     status: "Active",
   });
+
   const [savingUser, setSavingUser] = useState(false);
 
-  // Add user
-  const [addingUser, setAddingUser] = useState(false);
-  const [addForm, setAddForm] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    password: "",
-    role: "Citizen",
-    status: "Active",
-  });
-  const [creatingUser, setCreatingUser] = useState(false);
+  // =========================================================
+  // DELETE USER
+  // =========================================================
 
-  // Delete user
   const [deletingId, setDeletingId] = useState(null);
-
-  // =========================================================
-  // HELPERS
-  // =========================================================
 
   // =========================================================
   // NAVIGATION
@@ -48,19 +44,13 @@ function Users() {
   };
 
   // =========================================================
-  // FETCH USERS
+  // LOAD USERS
   // =========================================================
 
   const fetchUsers = useCallback(async () => {
     const data = await apiGet("/users");
 
-    return Array.isArray(data)
-      ? data
-      : Array.isArray(data?.users)
-        ? data.users
-        : Array.isArray(data?.data)
-          ? data.data
-          : [];
+    return data?.users || [];
   }, []);
 
   // =========================================================
@@ -84,7 +74,11 @@ function Users() {
         console.error("User fetch error:", err);
 
         if (!cancelled) {
-          setError(err.message || "Unable to load users.");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load users."
+          );
         }
       } finally {
         if (!cancelled) {
@@ -101,7 +95,7 @@ function Users() {
   }, [fetchUsers]);
 
   // =========================================================
-  // REFRESH
+  // REFRESH USERS
   // =========================================================
 
   const refreshUsers = async () => {
@@ -110,133 +104,23 @@ function Users() {
       setLoading(true);
 
       const data = await fetchUsers();
+
       setUsers(data);
     } catch (err) {
       console.error("User refresh error:", err);
-      setError(err.message || "Unable to refresh users.");
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to refresh users."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   // =========================================================
-  // ADD USER
-  // =========================================================
-
-  const openAddModal = () => {
-    setError("");
-
-    setAddForm({
-      full_name: "",
-      email: "",
-      phone: "",
-      password: "",
-      role: "Citizen",
-      status: "Active",
-    });
-
-    setAddingUser(true);
-  };
-
-  const closeAddModal = () => {
-    if (creatingUser) return;
-
-    setAddingUser(false);
-
-    setAddForm({
-      full_name: "",
-      email: "",
-      phone: "",
-      password: "",
-      role: "Citizen",
-      status: "Active",
-    });
-  };
-
-  const handleAddChange = (event) => {
-    const { name, value } = event.target;
-
-    setAddForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const createUser = async (event) => {
-    event.preventDefault();
-
-    try {
-      setCreatingUser(true);
-      setError("");
-
-      if (!addForm.full_name.trim()) {
-        throw new Error("Full name is required.");
-      }
-
-      if (!addForm.email.trim()) {
-        throw new Error("Email is required.");
-      }
-
-      if (!addForm.phone.trim()) {
-        throw new Error("Phone number is required.");
-      }
-
-      if (!addForm.password.trim()) {
-        throw new Error("Password is required.");
-      }
-
-      const email = addForm.email.trim().toLowerCase();
-      const phone = addForm.phone.trim();
-
-      const emailAlreadyExists = users.some(
-        (user) =>
-          String(user.email || "").trim().toLowerCase() === email
-      );
-
-      if (emailAlreadyExists) {
-        throw new Error("Email already registered.");
-      }
-
-      const phoneAlreadyExists = users.some(
-        (user) => String(user.phone || "").trim() === phone
-      );
-
-      if (phoneAlreadyExists) {
-        throw new Error("Phone number already registered.");
-      }
-
-      const data = await apiPost("/users", {
-        full_name: addForm.full_name.trim(),
-        email: addForm.email.trim(),
-        phone: addForm.phone.trim(),
-        password: addForm.password,
-        role: addForm.role,
-        status: addForm.status,
-      });
-
-      if (data.data) {
-        setUsers((previousUsers) => [
-          ...previousUsers,
-          data.data,
-        ]);
-      } else {
-        const updatedUsers = await fetchUsers();
-        setUsers(updatedUsers);
-      }
-
-      closeAddModal();
-
-      console.log("User created successfully:", data);
-    } catch (err) {
-      console.error("User create error:", err);
-      setError(err.message || "Unable to create user.");
-    } finally {
-      setCreatingUser(false);
-    }
-  };
-
-  // =========================================================
-  // EDIT USER
+  // OPEN EDIT MODAL
   // =========================================================
 
   const openEditModal = (user) => {
@@ -253,8 +137,14 @@ function Users() {
     });
   };
 
+  // =========================================================
+  // CLOSE EDIT MODAL
+  // =========================================================
+
   const closeEditModal = () => {
-    if (savingUser) return;
+    if (savingUser) {
+      return;
+    }
 
     setEditingUser(null);
 
@@ -263,10 +153,14 @@ function Users() {
       email: "",
       phone: "",
       password: "",
-      role: "Citizen",
+      role: "",
       status: "Active",
     });
   };
+
+  // =========================================================
+  // EDIT FORM CHANGE
+  // =========================================================
 
   const handleEditChange = (event) => {
     const { name, value } = event.target;
@@ -277,10 +171,16 @@ function Users() {
     }));
   };
 
+  // =========================================================
+  // UPDATE USER
+  // =========================================================
+
   const updateUser = async (event) => {
     event.preventDefault();
 
-    if (!editingUser) return;
+    if (!editingUser) {
+      return;
+    }
 
     try {
       setSavingUser(true);
@@ -324,7 +224,8 @@ function Users() {
         }
       );
 
-      if (data.data) {
+      // Update user immediately in the table.
+      if (data?.data) {
         setUsers((previousUsers) =>
           previousUsers.map((user) =>
             user.id === editingUser.id
@@ -342,7 +243,12 @@ function Users() {
       console.log("User updated successfully:", data);
     } catch (err) {
       console.error("User update error:", err);
-      setError(err.message || "Unable to update user.");
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to update user."
+      );
     } finally {
       setSavingUser(false);
     }
@@ -357,7 +263,9 @@ function Users() {
       `Are you sure you want to delete "${user.full_name}"?\n\nThis action cannot be undone.`
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
       setDeletingId(user.id);
@@ -367,6 +275,7 @@ function Users() {
         `/users/${user.id}`
       );
 
+      // Remove deleted user immediately.
       setUsers((previousUsers) =>
         previousUsers.filter(
           (existingUser) =>
@@ -377,7 +286,12 @@ function Users() {
       console.log("User deleted successfully:", data);
     } catch (err) {
       console.error("User delete error:", err);
-      setError(err.message || "Unable to delete user.");
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to delete user."
+      );
     } finally {
       setDeletingId(null);
     }
@@ -478,7 +392,10 @@ function Users() {
   return (
     <main className="users-main">
 
-      {/* HEADER */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
       <header className="users-header">
 
         <div className="users-header-left">
@@ -488,7 +405,7 @@ function Users() {
             className="back-button"
             onClick={goToDashboard}
           >
-            ← Dashboard
+            ← Back to Dashboard
           </button>
 
           <h1>Users</h1>
@@ -512,7 +429,11 @@ function Users() {
           <button
             type="button"
             className="add-user-button"
-            onClick={openAddModal}
+            onClick={() =>
+              alert(
+                "Add User functionality will be developed next."
+              )
+            }
           >
             + Add User
           </button>
@@ -521,14 +442,20 @@ function Users() {
 
       </header>
 
-      {/* ERROR */}
+      {/* =====================================================
+          ERROR
+      ===================================================== */}
+
       {error && (
         <div className="users-error">
           <strong>Error:</strong> {error}
         </div>
       )}
 
-      {/* STATISTICS */}
+      {/* =====================================================
+          STATISTICS
+      ===================================================== */}
+
       <section className="users-stats">
 
         <div className="user-stat-card total">
@@ -547,7 +474,7 @@ function Users() {
           <div>
             <span>Active</span>
             <strong>{activeUsers}</strong>
-            <small>Currently active</small>
+            <small>Active accounts</small>
           </div>
         </div>
 
@@ -557,7 +484,7 @@ function Users() {
           <div>
             <span>Inactive</span>
             <strong>{inactiveUsers}</strong>
-            <small>Not active</small>
+            <small>Inactive accounts</small>
           </div>
         </div>
 
@@ -567,7 +494,7 @@ function Users() {
           <div>
             <span>Admins</span>
             <strong>{adminUsers}</strong>
-            <small>Administrators</small>
+            <small>Administrator accounts</small>
           </div>
         </div>
 
@@ -575,21 +502,24 @@ function Users() {
           <div className="stat-icon">👤</div>
 
           <div>
-            <span>Staff / Citizens</span>
+            <span>Other Users</span>
             <strong>{staffUsers}</strong>
-            <small>Non-admin users</small>
+            <small>Non-admin accounts</small>
           </div>
         </div>
 
       </section>
 
-      {/* USER TABLE */}
+      {/* =====================================================
+          USER TABLE
+      ===================================================== */}
+
       <section className="users-table-card">
 
         <div className="users-table-header">
 
           <div>
-            <h2>User Network</h2>
+            <h2>User Directory</h2>
 
             <p>
               All registered RapidResQ users
@@ -597,8 +527,10 @@ function Users() {
           </div>
 
           <span className="user-count">
-            {totalUsers}{" "}
-            {totalUsers === 1 ? "user" : "users"}
+            {users.length}{" "}
+            {users.length === 1
+              ? "user"
+              : "users"}
           </span>
 
         </div>
@@ -658,13 +590,15 @@ function Users() {
                         </div>
 
                         <div>
+
                           <strong>
                             {user.full_name || "N/A"}
                           </strong>
 
                           <small>
-                            User ID: {user.id}
+                            User account
                           </small>
+
                         </div>
 
                       </div>
@@ -758,236 +692,110 @@ function Users() {
       </section>
 
       {/* =====================================================
-          ADD USER MODAL
-      ===================================================== */}
-
-      {addingUser && (
-
-        <div
-          className="modal-overlay"
-          onClick={closeAddModal}
-        >
-
-          <div
-            className="user-modal"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-
-            <div className="modal-header">
-
-              <div>
-                <h2>Add User</h2>
-
-                <p>
-                  Create a new RapidResQ user account
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="modal-close"
-                onClick={closeAddModal}
-                disabled={creatingUser}
-              >
-                ×
-              </button>
-
-            </div>
-
-            <form onSubmit={createUser}>
-
-              <div className="form-group">
-                <label htmlFor="add-full-name">
-                  Full Name
-                </label>
-
-                <input
-                  id="add-full-name"
-                  type="text"
-                  name="full_name"
-                  value={addForm.full_name}
-                  onChange={handleAddChange}
-                  required
-                  placeholder="Enter full name"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="add-email">
-                  Email
-                </label>
-
-                <input
-                  id="add-email"
-                  type="email"
-                  name="email"
-                  value={addForm.email}
-                  onChange={handleAddChange}
-                  required
-                  placeholder="Enter email address"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="add-phone">
-                  Phone
-                </label>
-
-                <input
-                  id="add-phone"
-                  type="text"
-                  name="phone"
-                  value={addForm.phone}
-                  onChange={handleAddChange}
-                  required
-                  placeholder="Enter phone number"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="add-role">
-                  Role
-                </label>
-
-                <select
-                  id="add-role"
-                  name="role"
-                  value={addForm.role}
-                  onChange={handleAddChange}
-                  required
-                >
-                  <option value="Admin">
-                    Admin
-                  </option>
-
-                  <option value="Citizen">
-                    Citizen
-                  </option>
-
-                  <option value="Dispatcher">
-                    Dispatcher
-                  </option>
-
-                  <option value="Hospital">
-                    Hospital
-                  </option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="add-status">
-                  Status
-                </label>
-
-                <select
-                  id="add-status"
-                  name="status"
-                  value={addForm.status}
-                  onChange={handleAddChange}
-                  required
-                >
-                  <option value="Active">
-                    Active
-                  </option>
-
-                  <option value="Inactive">
-                    Inactive
-                  </option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="add-password">
-                  Password
-                </label>
-
-                <input
-                  id="add-password"
-                  type="password"
-                  name="password"
-                  value={addForm.password}
-                  onChange={handleAddChange}
-                  required
-                  placeholder="Enter password"
-                />
-              </div>
-
-              <div className="modal-actions">
-
-                <button
-                  type="button"
-                  className="cancel-button"
-                  onClick={closeAddModal}
-                  disabled={creatingUser}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="save-button"
-                  disabled={creatingUser}
-                >
-                  {creatingUser
-                    ? "Creating..."
-                    : "Create User"}
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        </div>
-
-      )}
-
-      {/* =====================================================
           EDIT USER MODAL
       ===================================================== */}
 
       {editingUser && (
 
         <div
-          className="modal-overlay"
           onClick={closeEditModal}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px",
+          }}
         >
 
           <div
-            className="user-modal"
             onClick={(event) =>
               event.stopPropagation()
             }
+            style={{
+              width: "100%",
+              maxWidth: "520px",
+              background: "#ffffff",
+              borderRadius: "14px",
+              padding: "28px",
+              boxShadow:
+                "0 20px 50px rgba(0, 0, 0, 0.18)",
+            }}
           >
 
-            <div className="modal-header">
+            {/* MODAL HEADER */}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "22px",
+              }}
+            >
 
               <div>
-                <h2>Edit User</h2>
 
-                <p>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: "22px",
+                    color: "#171717",
+                  }}
+                >
+                  Edit User
+                </h2>
+
+                <p
+                  style={{
+                    margin: "6px 0 0",
+                    color: "#6b7280",
+                    fontSize: "14px",
+                  }}
+                >
                   Update user account details
                 </p>
+
               </div>
 
               <button
                 type="button"
-                className="modal-close"
                 onClick={closeEditModal}
                 disabled={savingUser}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  fontSize: "24px",
+                  color: "#6b7280",
+                  cursor: "pointer",
+                }}
               >
                 ×
               </button>
 
             </div>
 
+            {/* EDIT FORM */}
+
             <form onSubmit={updateUser}>
 
-              <div className="form-group">
-                <label htmlFor="edit-full-name">
+              {/* FULL NAME */}
+
+              <div style={{ marginBottom: "16px" }}>
+
+                <label
+                  htmlFor="edit-full-name"
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#374151",
+                  }}
+                >
                   Full Name
                 </label>
 
@@ -998,11 +806,32 @@ function Users() {
                   value={editForm.full_name}
                   onChange={handleEditChange}
                   required
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    outline: "none",
+                  }}
                 />
+
               </div>
 
-              <div className="form-group">
-                <label htmlFor="edit-email">
+              {/* EMAIL */}
+
+              <div style={{ marginBottom: "16px" }}>
+
+                <label
+                  htmlFor="edit-email"
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#374151",
+                  }}
+                >
                   Email
                 </label>
 
@@ -1013,11 +842,32 @@ function Users() {
                   value={editForm.email}
                   onChange={handleEditChange}
                   required
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    outline: "none",
+                  }}
                 />
+
               </div>
 
-              <div className="form-group">
-                <label htmlFor="edit-phone">
+              {/* PHONE */}
+
+              <div style={{ marginBottom: "16px" }}>
+
+                <label
+                  htmlFor="edit-phone"
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#374151",
+                  }}
+                >
                   Phone
                 </label>
 
@@ -1028,11 +878,32 @@ function Users() {
                   value={editForm.phone}
                   onChange={handleEditChange}
                   required
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    outline: "none",
+                  }}
                 />
+
               </div>
 
-              <div className="form-group">
-                <label htmlFor="edit-role">
+              {/* ROLE */}
+
+              <div style={{ marginBottom: "16px" }}>
+
+                <label
+                  htmlFor="edit-role"
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#374151",
+                  }}
+                >
                   Role
                 </label>
 
@@ -1042,27 +913,42 @@ function Users() {
                   value={editForm.role}
                   onChange={handleEditChange}
                   required
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    background: "#ffffff",
+                    outline: "none",
+                  }}
                 >
-                  <option value="Admin">
-                    Admin
-                  </option>
-
-                  <option value="Citizen">
-                    Citizen
-                  </option>
-
+                  <option value="Admin">Admin</option>
+                  <option value="Citizen">Citizen</option>
                   <option value="Dispatcher">
                     Dispatcher
                   </option>
-
                   <option value="Hospital">
                     Hospital
                   </option>
                 </select>
+
               </div>
 
-              <div className="form-group">
-                <label htmlFor="edit-status">
+              {/* STATUS */}
+
+              <div style={{ marginBottom: "16px" }}>
+
+                <label
+                  htmlFor="edit-status"
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#374151",
+                  }}
+                >
                   Status
                 </label>
 
@@ -1072,19 +958,38 @@ function Users() {
                   value={editForm.status}
                   onChange={handleEditChange}
                   required
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    background: "#ffffff",
+                    outline: "none",
+                  }}
                 >
-                  <option value="Active">
-                    Active
-                  </option>
-
+                  <option value="Active">Active</option>
                   <option value="Inactive">
                     Inactive
                   </option>
                 </select>
+
               </div>
 
-              <div className="form-group">
-                <label htmlFor="edit-password">
+              {/* PASSWORD */}
+
+              <div style={{ marginBottom: "22px" }}>
+
+                <label
+                  htmlFor="edit-password"
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#374151",
+                  }}
+                >
                   New Password
                 </label>
 
@@ -1096,29 +1001,76 @@ function Users() {
                   onChange={handleEditChange}
                   required
                   placeholder="Enter new password"
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    outline: "none",
+                  }}
                 />
 
-                <small className="form-help">
-                  Enter a new password when updating
-                  the user.
+                <small
+                  style={{
+                    display: "block",
+                    marginTop: "6px",
+                    color: "#6b7280",
+                    fontSize: "12px",
+                  }}
+                >
+                  The current backend requires a
+                  password when updating a user.
                 </small>
+
               </div>
 
-              <div className="modal-actions">
+              {/* BUTTONS */}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "10px",
+                }}
+              >
 
                 <button
                   type="button"
-                  className="cancel-button"
                   onClick={closeEditModal}
                   disabled={savingUser}
+                  style={{
+                    padding: "10px 18px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    background: "#ffffff",
+                    color: "#374151",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    cursor: savingUser
+                      ? "not-allowed"
+                      : "pointer",
+                  }}
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="save-button"
                   disabled={savingUser}
+                  style={{
+                    padding: "10px 18px",
+                    border: "none",
+                    borderRadius: "8px",
+                    background: "#ef1b2d",
+                    color: "#ffffff",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    cursor: savingUser
+                      ? "not-allowed"
+                      : "pointer",
+                    opacity: savingUser ? 0.7 : 1,
+                  }}
                 >
                   {savingUser
                     ? "Saving..."
