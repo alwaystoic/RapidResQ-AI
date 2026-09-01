@@ -1,5 +1,6 @@
 /* ============================================================
-   GLOBAL APP STYLES
+   RAPIDRESQ AI — GLOBAL APP STYLES
+   Day 9.5 — Consistent Design
    ============================================================ */
 
 * {
@@ -16,8 +17,49 @@ body,
 
 body {
   font-family: Arial, Helvetica, sans-serif;
-  background: #f7f8fa;
+  background: #f5f7fa;
   color: #171717;
+}
+
+
+/* ============================================================
+   SHARED DESIGN TOKENS
+   ============================================================ */
+
+:root {
+  --primary: #e5252a;
+  --primary-dark: #cf1f24;
+  --primary-light: #fff0f0;
+
+  --text: #171717;
+  --text-secondary: #666666;
+  --text-muted: #888888;
+
+  --border: #e5e7eb;
+  --border-light: #eeeeee;
+
+  --surface: #ffffff;
+  --background: #f5f7fa;
+
+  --success: #218838;
+  --success-light: #eaf8ef;
+
+  --warning: #c77b00;
+  --warning-light: #fff5e6;
+
+  --info: #2864c7;
+  --info-light: #eaf2ff;
+
+  --danger: #d71920;
+  --danger-light: #fff0f0;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.07);
 }
 
 
@@ -27,21 +69,28 @@ body {
 
 .login-page {
   min-height: 100vh;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f7f8fa;
+
+  background: var(--background);
+
   padding: 20px;
 }
 
 .login-card {
   width: 400px;
   max-width: 100%;
-  background: #ffffff;
+
+  background: var(--surface);
+
   padding: 40px;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e8e8e8;
+
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+
+  box-shadow: var(--shadow-md);
 }
 
 
@@ -52,15 +101,21 @@ body {
 .login-logo {
   display: flex;
   align-items: center;
+
   gap: 12px;
+
   margin-bottom: 30px;
 }
 
 .login-logo-icon {
   width: 42px;
   height: 42px;
-  border-radius: 10px;
-  background: #e5252a;
+
+  flex-shrink: 0;
+
+  border-radius: var(--radius-md);
+
+  background: var(--primary);
   color: #ffffff;
 
   display: flex;
@@ -68,19 +123,25 @@ body {
   justify-content: center;
 
   font-size: 24px;
-  font-weight: bold;
+  font-weight: 800;
+
+  box-shadow: 0 5px 13px rgba(229, 37, 42, 0.14);
 }
 
 .login-logo h1 {
   margin: 0;
+
   font-size: 24px;
-  color: #171717;
+  font-weight: 800;
+
+  color: var(--text);
 }
 
 .login-logo p {
   margin: 3px 0 0;
+
   font-size: 12px;
-  color: #888888;
+  color: var(--text-muted);
 }
 
 
@@ -94,14 +155,19 @@ body {
 
 .login-heading h2 {
   margin: 0;
+
   font-size: 22px;
-  color: #171717;
+  font-weight: 750;
+
+  color: var(--text);
 }
 
 .login-heading p {
   margin: 7px 0 0;
+
   color: #777777;
   font-size: 13px;
+  line-height: 1.5;
 }
 
 
@@ -110,15 +176,19 @@ body {
    ============================================================ */
 
 .login-error {
-  background: #fff0f0;
+  background: var(--danger-light);
+
   border: 1px solid #ffd0d0;
-  color: #d71920;
+  border-radius: var(--radius-sm);
+
+  color: var(--danger);
 
   padding: 11px 13px;
-  border-radius: 8px;
 
   margin-bottom: 18px;
-  font-size: 13px;
+
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 
@@ -132,31 +202,48 @@ body {
 
 .login-field label {
   display: block;
+
   margin-bottom: 7px;
 
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+
   color: #444444;
 }
 
 .login-field input {
   width: 100%;
+
   padding: 12px 13px;
 
   border: 1px solid #dddddd;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
+
+  background: #ffffff;
+
+  color: var(--text);
 
   font-size: 14px;
+
   outline: none;
 
   transition:
     border-color 0.2s ease,
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.login-field input:hover {
+  border-color: #cccccc;
 }
 
 .login-field input:focus {
-  border-color: #e5252a;
-  box-shadow: 0 0 0 3px rgba(229, 37, 42, 0.08);
+  border-color: var(--primary);
+
+  box-shadow:
+    0 0 0 3px rgba(229, 37, 42, 0.08);
+
+  background: #ffffff;
 }
 
 .login-password-field {
@@ -170,35 +257,47 @@ body {
 
 .login-button {
   width: 100%;
+
   padding: 13px;
 
   border: none;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
 
-  background: #e5252a;
+  background: var(--primary);
   color: #ffffff;
 
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
 
   cursor: pointer;
 
   transition:
     background 0.2s ease,
-    transform 0.1s ease;
+    transform 0.1s ease,
+    box-shadow 0.2s ease;
 }
 
 .login-button:hover {
-  background: #cf1f24;
+  background: var(--primary-dark);
+
+  box-shadow:
+    0 5px 14px rgba(229, 37, 42, 0.16);
 }
 
 .login-button:active {
   transform: scale(0.99);
 }
 
+.login-button:focus-visible {
+  outline: 3px solid rgba(229, 37, 42, 0.2);
+  outline-offset: 2px;
+}
+
 .login-button.loading {
   background: #ef6b6f;
   cursor: not-allowed;
+
+  box-shadow: none;
 }
 
 
@@ -228,18 +327,26 @@ body {
   align-items: center;
   justify-content: center;
 
-  background: #f7f8fa;
+  background: var(--background);
+
   padding: 20px;
 }
 
 .placeholder-card {
-  background: #ffffff;
+  width: 100%;
+  max-width: 520px;
+
+  background: var(--surface);
+
   padding: 50px;
 
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
+
   text-align: center;
 
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border);
+
+  box-shadow: var(--shadow-md);
 }
 
 .placeholder-icon {
@@ -249,12 +356,20 @@ body {
 
 .placeholder-card h1 {
   margin: 0;
-  color: #171717;
+
+  color: var(--text);
+
+  font-size: 24px;
+  font-weight: 750;
 }
 
 .placeholder-card p {
-  color: #777777;
+  color: var(--text-secondary);
+
   margin-top: 10px;
+
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .placeholder-card button {
@@ -263,17 +378,45 @@ body {
   padding: 11px 20px;
 
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 
-  background: #e5252a;
+  background: var(--primary);
   color: #ffffff;
 
   cursor: pointer;
-  font-weight: 600;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  transition:
+    background 0.2s ease,
+    transform 0.1s ease,
+    box-shadow 0.2s ease;
 }
 
 .placeholder-card button:hover {
-  background: #cf1f24;
+  background: var(--primary-dark);
+
+  box-shadow:
+    0 5px 13px rgba(229, 37, 42, 0.14);
+}
+
+.placeholder-card button:active {
+  transform: scale(0.99);
+}
+
+
+/* ============================================================
+   SHARED FOCUS STYLE
+   ============================================================ */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(229, 37, 42, 0.18);
+  outline-offset: 2px;
 }
 
 
@@ -282,8 +425,19 @@ body {
    ============================================================ */
 
 @media (max-width: 480px) {
+
+  .login-page {
+    padding: 14px;
+  }
+
   .login-card {
     padding: 28px 22px;
+
+    border-radius: 14px;
+  }
+
+  .login-logo {
+    margin-bottom: 25px;
   }
 
   .login-logo h1 {
@@ -292,5 +446,26 @@ body {
 
   .login-heading h2 {
     font-size: 20px;
+  }
+
+  .placeholder-card {
+    padding: 35px 22px;
+  }
+}
+
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
